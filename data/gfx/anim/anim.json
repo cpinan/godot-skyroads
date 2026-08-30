@@ -1,0 +1,2289 @@
+{
+ "declared_frames": 100,
+ "deltas": 221,
+ "ticks_per_frame": 2,
+ "fps": 18.0,
+ "palette": [
+  [
+   0,
+   0,
+   0
+  ],
+  [
+   32,
+   4,
+   36
+  ],
+  [
+   40,
+   4,
+   44
+  ],
+  [
+   48,
+   8,
+   52
+  ],
+  [
+   56,
+   8,
+   65
+  ],
+  [
+   65,
+   8,
+   73
+  ],
+  [
+   73,
+   8,
+   81
+  ],
+  [
+   85,
+   8,
+   89
+  ],
+  [
+   93,
+   8,
+   101
+  ],
+  [
+   101,
+   8,
+   109
+  ],
+  [
+   113,
+   4,
+   117
+  ],
+  [
+   121,
+   4,
+   130
+  ],
+  [
+   134,
+   4,
+   138
+  ],
+  [
+   142,
+   0,
+   146
+  ],
+  [
+   154,
+   0,
+   154
+  ],
+  [
+   166,
+   0,
+   166
+  ],
+  [
+   8,
+   20,
+   28
+  ],
+  [
+   12,
+   28,
+   40
+  ],
+  [
+   16,
+   40,
+   56
+  ],
+  [
+   20,
+   48,
+   69
+  ],
+  [
+   28,
+   56,
+   81
+  ],
+  [
+   32,
+   69,
+   97
+  ],
+  [
+   36,
+   77,
+   109
+  ],
+  [
+   40,
+   85,
+   125
+  ],
+  [
+   48,
+   97,
+   138
+  ],
+  [
+   52,
+   105,
+   154
+  ],
+  [
+   56,
+   113,
+   166
+  ],
+  [
+   60,
+   121,
+   182
+  ],
+  [
+   65,
+   130,
+   195
+  ],
+  [
+   69,
+   138,
+   211
+  ],
+  [
+   73,
+   146,
+   223
+  ],
+  [
+   81,
+   154,
+   239
+  ],
+  [
+   0,
+   0,
+   24
+  ],
+  [
+   0,
+   0,
+   32
+  ],
+  [
+   0,
+   4,
+   40
+  ],
+  [
+   4,
+   4,
+   52
+  ],
+  [
+   4,
+   12,
+   60
+  ],
+  [
+   12,
+   20,
+   73
+  ],
+  [
+   0,
+   0,
+   0
+  ],
+  [
+   166,
+   219,
+   255
+  ],
+  [
+   154,
+   203,
+   243
+  ],
+  [
+   138,
+   186,
+   231
+  ],
+  [
+   130,
+   174,
+   219
+  ],
+  [
+   117,
+   162,
+   207
+  ],
+  [
+   105,
+   146,
+   195
+  ],
+  [
+   93,
+   134,
+   182
+  ],
+  [
+   85,
+   121,
+   174
+  ],
+  [
+   73,
+   109,
+   162
+  ],
+  [
+   65,
+   97,
+   150
+  ],
+  [
+   56,
+   85,
+   138
+  ],
+  [
+   48,
+   73,
+   125
+  ],
+  [
+   40,
+   65,
+   113
+  ],
+  [
+   36,
+   52,
+   101
+  ],
+  [
+   28,
+   44,
+   89
+  ],
+  [
+   24,
+   36,
+   81
+  ],
+  [
+   219,
+   227,
+   235
+  ],
+  [
+   207,
+   215,
+   223
+  ],
+  [
+   195,
+   203,
+   211
+  ],
+  [
+   182,
+   190,
+   199
+  ],
+  [
+   170,
+   178,
+   186
+  ],
+  [
+   158,
+   166,
+   174
+  ],
+  [
+   146,
+   154,
+   162
+  ],
+  [
+   134,
+   142,
+   150
+  ],
+  [
+   125,
+   130,
+   138
+  ],
+  [
+   113,
+   117,
+   125
+  ],
+  [
+   101,
+   109,
+   113
+  ],
+  [
+   89,
+   97,
+   101
+  ],
+  [
+   77,
+   85,
+   89
+  ],
+  [
+   69,
+   73,
+   77
+  ],
+  [
+   56,
+   60,
+   69
+  ],
+  [
+   48,
+   52,
+   56
+  ],
+  [
+   0,
+   81,
+   255
+  ],
+  [
+   8,
+   73,
+   235
+  ],
+  [
+   20,
+   73,
+   219
+  ],
+  [
+   28,
+   69,
+   199
+  ],
+  [
+   36,
+   65,
+   182
+  ],
+  [
+   40,
+   60,
+   166
+  ],
+  [
+   44,
+   60,
+   146
+  ],
+  [
+   48,
+   56,
+   130
+  ],
+  [
+   48,
+   52,
+   113
+  ],
+  [
+   0,
+   0,
+   134
+  ],
+  [
+   0,
+   0,
+   117
+  ],
+  [
+   0,
+   0,
+   105
+  ],
+  [
+   0,
+   0,
+   89
+  ],
+  [
+   0,
+   0,
+   77
+  ],
+  [
+   0,
+   0,
+   60
+  ],
+  [
+   0,
+   0,
+   48
+  ],
+  [
+   16,
+   195,
+   255
+  ],
+  [
+   8,
+   158,
+   255
+  ],
+  [
+   4,
+   121,
+   255
+  ],
+  [
+   134,
+   0,
+   0
+  ],
+  [
+   150,
+   8,
+   0
+  ],
+  [
+   166,
+   20,
+   0
+  ],
+  [
+   182,
+   40,
+   0
+  ],
+  [
+   203,
+   60,
+   0
+  ],
+  [
+   219,
+   81,
+   0
+  ],
+  [
+   235,
+   109,
+   0
+  ],
+  [
+   255,
+   138,
+   0
+  ],
+  [
+   255,
+   162,
+   28
+  ],
+  [
+   255,
+   186,
+   65
+  ],
+  [
+   255,
+   207,
+   97
+  ],
+  [
+   255,
+   223,
+   134
+  ]
+ ],
+ "note": "each entry is a delta rectangle blitted over the previous image at its screen offset, not a full frame",
+ "frames": [
+  {
+   "file": "anim_000_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 20,
+   "screen_x": 58,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_001_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 34,
+   "screen_x": 84,
+   "screen_y": 130
+  },
+  {
+   "file": "anim_002_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 36,
+   "screen_x": 58,
+   "screen_y": 164
+  },
+  {
+   "file": "anim_003_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 36,
+   "screen_x": 84,
+   "screen_y": 164
+  },
+  {
+   "file": "anim_004_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 30,
+   "screen_x": 110,
+   "screen_y": 122
+  },
+  {
+   "file": "anim_005_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 22,
+   "screen_x": 136,
+   "screen_y": 106
+  },
+  {
+   "file": "anim_006_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 136,
+   "screen_y": 128
+  },
+  {
+   "file": "anim_007_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 110,
+   "screen_y": 152
+  },
+  {
+   "file": "anim_008_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 110,
+   "screen_y": 176
+  },
+  {
+   "file": "anim_009_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 136,
+   "screen_y": 152
+  },
+  {
+   "file": "anim_010_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 136,
+   "screen_y": 176
+  },
+  {
+   "file": "anim_011_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 22,
+   "screen_x": 162,
+   "screen_y": 106
+  },
+  {
+   "file": "anim_012_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 162,
+   "screen_y": 128
+  },
+  {
+   "file": "anim_013_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 30,
+   "screen_x": 188,
+   "screen_y": 122
+  },
+  {
+   "file": "anim_014_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 162,
+   "screen_y": 152
+  },
+  {
+   "file": "anim_015_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 162,
+   "screen_y": 176
+  },
+  {
+   "file": "anim_016_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 188,
+   "screen_y": 152
+  },
+  {
+   "file": "anim_017_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 24,
+   "screen_x": 188,
+   "screen_y": 176
+  },
+  {
+   "file": "anim_018_f000.png",
+   "frame": 0,
+   "w": 22,
+   "h": 34,
+   "screen_x": 214,
+   "screen_y": 130
+  },
+  {
+   "file": "anim_019_f000.png",
+   "frame": 0,
+   "w": 24,
+   "h": 20,
+   "screen_x": 236,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_020_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 36,
+   "screen_x": 214,
+   "screen_y": 164
+  },
+  {
+   "file": "anim_021_f000.png",
+   "frame": 0,
+   "w": 26,
+   "h": 36,
+   "screen_x": 240,
+   "screen_y": 164
+  },
+  {
+   "file": "anim_022_f001.png",
+   "frame": 1,
+   "w": 18,
+   "h": 24,
+   "screen_x": 84,
+   "screen_y": 120
+  },
+  {
+   "file": "anim_023_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 36,
+   "screen_x": 102,
+   "screen_y": 108
+  },
+  {
+   "file": "anim_024_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 12,
+   "screen_x": 122,
+   "screen_y": 104
+  },
+  {
+   "file": "anim_025_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 26,
+   "screen_x": 142,
+   "screen_y": 90
+  },
+  {
+   "file": "anim_026_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 28,
+   "screen_x": 122,
+   "screen_y": 116
+  },
+  {
+   "file": "anim_027_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 28,
+   "screen_x": 142,
+   "screen_y": 116
+  },
+  {
+   "file": "anim_028_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 58,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_029_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 84,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_030_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 58,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_031_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 84,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_032_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 110,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_033_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 136,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_034_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 110,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_035_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 136,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_036_f001.png",
+   "frame": 1,
+   "w": 38,
+   "h": 26,
+   "screen_x": 162,
+   "screen_y": 90
+  },
+  {
+   "file": "anim_037_f001.png",
+   "frame": 1,
+   "w": 18,
+   "h": 28,
+   "screen_x": 162,
+   "screen_y": 116
+  },
+  {
+   "file": "anim_038_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 28,
+   "screen_x": 180,
+   "screen_y": 116
+  },
+  {
+   "file": "anim_039_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 36,
+   "screen_x": 200,
+   "screen_y": 108
+  },
+  {
+   "file": "anim_040_f001.png",
+   "frame": 1,
+   "w": 20,
+   "h": 24,
+   "screen_x": 220,
+   "screen_y": 120
+  },
+  {
+   "file": "anim_041_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 162,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_042_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 188,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_043_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 162,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_044_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 188,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_045_f001.png",
+   "frame": 1,
+   "w": 24,
+   "h": 28,
+   "screen_x": 214,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_046_f001.png",
+   "frame": 1,
+   "w": 24,
+   "h": 28,
+   "screen_x": 238,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_047_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 214,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_048_f001.png",
+   "frame": 1,
+   "w": 26,
+   "h": 28,
+   "screen_x": 240,
+   "screen_y": 172
+  },
+  {
+   "file": "anim_049_f002.png",
+   "frame": 2,
+   "w": 32,
+   "h": 30,
+   "screen_x": 98,
+   "screen_y": 94
+  },
+  {
+   "file": "anim_050_f002.png",
+   "frame": 2,
+   "w": 32,
+   "h": 22,
+   "screen_x": 130,
+   "screen_y": 80
+  },
+  {
+   "file": "anim_051_f002.png",
+   "frame": 2,
+   "w": 32,
+   "h": 22,
+   "screen_x": 130,
+   "screen_y": 102
+  },
+  {
+   "file": "anim_052_f002.png",
+   "frame": 2,
+   "w": 38,
+   "h": 20,
+   "screen_x": 84,
+   "screen_y": 124
+  },
+  {
+   "file": "anim_053_f002.png",
+   "frame": 2,
+   "w": 38,
+   "h": 22,
+   "screen_x": 84,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_054_f002.png",
+   "frame": 2,
+   "w": 40,
+   "h": 22,
+   "screen_x": 122,
+   "screen_y": 124
+  },
+  {
+   "file": "anim_055_f002.png",
+   "frame": 2,
+   "w": 40,
+   "h": 22,
+   "screen_x": 122,
+   "screen_y": 146
+  },
+  {
+   "file": "anim_056_f002.png",
+   "frame": 2,
+   "w": 32,
+   "h": 22,
+   "screen_x": 162,
+   "screen_y": 80
+  },
+  {
+   "file": "anim_057_f002.png",
+   "frame": 2,
+   "w": 32,
+   "h": 22,
+   "screen_x": 162,
+   "screen_y": 102
+  },
+  {
+   "file": "anim_058_f002.png",
+   "frame": 2,
+   "w": 32,
+   "h": 28,
+   "screen_x": 194,
+   "screen_y": 96
+  },
+  {
+   "file": "anim_059_f002.png",
+   "frame": 2,
+   "w": 38,
+   "h": 22,
+   "screen_x": 162,
+   "screen_y": 124
+  },
+  {
+   "file": "anim_060_f002.png",
+   "frame": 2,
+   "w": 38,
+   "h": 22,
+   "screen_x": 162,
+   "screen_y": 146
+  },
+  {
+   "file": "anim_061_f002.png",
+   "frame": 2,
+   "w": 40,
+   "h": 20,
+   "screen_x": 200,
+   "screen_y": 124
+  },
+  {
+   "file": "anim_062_f002.png",
+   "frame": 2,
+   "w": 40,
+   "h": 22,
+   "screen_x": 200,
+   "screen_y": 144
+  },
+  {
+   "file": "anim_063_f003.png",
+   "frame": 3,
+   "w": 26,
+   "h": 22,
+   "screen_x": 108,
+   "screen_y": 86
+  },
+  {
+   "file": "anim_064_f003.png",
+   "frame": 3,
+   "w": 28,
+   "h": 34,
+   "screen_x": 134,
+   "screen_y": 74
+  },
+  {
+   "file": "anim_065_f003.png",
+   "frame": 3,
+   "w": 30,
+   "h": 32,
+   "screen_x": 100,
+   "screen_y": 108
+  },
+  {
+   "file": "anim_066_f003.png",
+   "frame": 3,
+   "w": 32,
+   "h": 16,
+   "screen_x": 130,
+   "screen_y": 108
+  },
+  {
+   "file": "anim_067_f003.png",
+   "frame": 3,
+   "w": 32,
+   "h": 18,
+   "screen_x": 130,
+   "screen_y": 124
+  },
+  {
+   "file": "anim_068_f003.png",
+   "frame": 3,
+   "w": 26,
+   "h": 34,
+   "screen_x": 162,
+   "screen_y": 74
+  },
+  {
+   "file": "anim_069_f003.png",
+   "frame": 3,
+   "w": 26,
+   "h": 22,
+   "screen_x": 188,
+   "screen_y": 86
+  },
+  {
+   "file": "anim_070_f003.png",
+   "frame": 3,
+   "w": 30,
+   "h": 16,
+   "screen_x": 162,
+   "screen_y": 108
+  },
+  {
+   "file": "anim_071_f003.png",
+   "frame": 3,
+   "w": 30,
+   "h": 18,
+   "screen_x": 162,
+   "screen_y": 124
+  },
+  {
+   "file": "anim_072_f003.png",
+   "frame": 3,
+   "w": 16,
+   "h": 32,
+   "screen_x": 192,
+   "screen_y": 108
+  },
+  {
+   "file": "anim_073_f003.png",
+   "frame": 3,
+   "w": 16,
+   "h": 28,
+   "screen_x": 208,
+   "screen_y": 108
+  },
+  {
+   "file": "anim_074_f004.png",
+   "frame": 4,
+   "w": 22,
+   "h": 18,
+   "screen_x": 114,
+   "screen_y": 80
+  },
+  {
+   "file": "anim_075_f004.png",
+   "frame": 4,
+   "w": 24,
+   "h": 28,
+   "screen_x": 136,
+   "screen_y": 70
+  },
+  {
+   "file": "anim_076_f004.png",
+   "frame": 4,
+   "w": 24,
+   "h": 26,
+   "screen_x": 110,
+   "screen_y": 98
+  },
+  {
+   "file": "anim_077_f004.png",
+   "frame": 4,
+   "w": 26,
+   "h": 28,
+   "screen_x": 134,
+   "screen_y": 98
+  },
+  {
+   "file": "anim_078_f004.png",
+   "frame": 4,
+   "w": 22,
+   "h": 28,
+   "screen_x": 160,
+   "screen_y": 68
+  },
+  {
+   "file": "anim_079_f004.png",
+   "frame": 4,
+   "w": 22,
+   "h": 16,
+   "screen_x": 182,
+   "screen_y": 80
+  },
+  {
+   "file": "anim_080_f004.png",
+   "frame": 4,
+   "w": 26,
+   "h": 30,
+   "screen_x": 160,
+   "screen_y": 96
+  },
+  {
+   "file": "anim_081_f004.png",
+   "frame": 4,
+   "w": 26,
+   "h": 28,
+   "screen_x": 186,
+   "screen_y": 96
+  },
+  {
+   "file": "anim_082_f005.png",
+   "frame": 5,
+   "w": 20,
+   "h": 14,
+   "screen_x": 120,
+   "screen_y": 76
+  },
+  {
+   "file": "anim_083_f005.png",
+   "frame": 5,
+   "w": 22,
+   "h": 24,
+   "screen_x": 140,
+   "screen_y": 66
+  },
+  {
+   "file": "anim_084_f005.png",
+   "frame": 5,
+   "w": 22,
+   "h": 22,
+   "screen_x": 118,
+   "screen_y": 90
+  },
+  {
+   "file": "anim_085_f005.png",
+   "frame": 5,
+   "w": 22,
+   "h": 24,
+   "screen_x": 140,
+   "screen_y": 90
+  },
+  {
+   "file": "anim_086_f005.png",
+   "frame": 5,
+   "w": 36,
+   "h": 22,
+   "screen_x": 162,
+   "screen_y": 66
+  },
+  {
+   "file": "anim_087_f005.png",
+   "frame": 5,
+   "w": 22,
+   "h": 24,
+   "screen_x": 162,
+   "screen_y": 88
+  },
+  {
+   "file": "anim_088_f005.png",
+   "frame": 5,
+   "w": 22,
+   "h": 24,
+   "screen_x": 184,
+   "screen_y": 88
+  },
+  {
+   "file": "anim_089_f006.png",
+   "frame": 6,
+   "w": 36,
+   "h": 20,
+   "screen_x": 126,
+   "screen_y": 64
+  },
+  {
+   "file": "anim_090_f006.png",
+   "frame": 6,
+   "w": 38,
+   "h": 20,
+   "screen_x": 124,
+   "screen_y": 84
+  },
+  {
+   "file": "anim_091_f006.png",
+   "frame": 6,
+   "w": 34,
+   "h": 20,
+   "screen_x": 162,
+   "screen_y": 64
+  },
+  {
+   "file": "anim_092_f006.png",
+   "frame": 6,
+   "w": 38,
+   "h": 20,
+   "screen_x": 162,
+   "screen_y": 84
+  },
+  {
+   "file": "anim_093_f007.png",
+   "frame": 7,
+   "w": 30,
+   "h": 18,
+   "screen_x": 130,
+   "screen_y": 60
+  },
+  {
+   "file": "anim_094_f007.png",
+   "frame": 7,
+   "w": 34,
+   "h": 20,
+   "screen_x": 126,
+   "screen_y": 78
+  },
+  {
+   "file": "anim_095_f007.png",
+   "frame": 7,
+   "w": 30,
+   "h": 18,
+   "screen_x": 160,
+   "screen_y": 60
+  },
+  {
+   "file": "anim_096_f007.png",
+   "frame": 7,
+   "w": 36,
+   "h": 20,
+   "screen_x": 160,
+   "screen_y": 78
+  },
+  {
+   "file": "anim_097_f008.png",
+   "frame": 8,
+   "w": 30,
+   "h": 32,
+   "screen_x": 130,
+   "screen_y": 60
+  },
+  {
+   "file": "anim_098_f008.png",
+   "frame": 8,
+   "w": 16,
+   "h": 32,
+   "screen_x": 160,
+   "screen_y": 60
+  },
+  {
+   "file": "anim_099_f008.png",
+   "frame": 8,
+   "w": 16,
+   "h": 24,
+   "screen_x": 176,
+   "screen_y": 68
+  },
+  {
+   "file": "anim_100_f009.png",
+   "frame": 9,
+   "w": 28,
+   "h": 30,
+   "screen_x": 132,
+   "screen_y": 58
+  },
+  {
+   "file": "anim_101_f009.png",
+   "frame": 9,
+   "w": 28,
+   "h": 30,
+   "screen_x": 160,
+   "screen_y": 58
+  },
+  {
+   "file": "anim_102_f010.png",
+   "frame": 10,
+   "w": 24,
+   "h": 26,
+   "screen_x": 136,
+   "screen_y": 58
+  },
+  {
+   "file": "anim_103_f010.png",
+   "frame": 10,
+   "w": 26,
+   "h": 28,
+   "screen_x": 160,
+   "screen_y": 56
+  },
+  {
+   "file": "anim_104_f011.png",
+   "frame": 11,
+   "w": 22,
+   "h": 24,
+   "screen_x": 138,
+   "screen_y": 56
+  },
+  {
+   "file": "anim_105_f011.png",
+   "frame": 11,
+   "w": 24,
+   "h": 24,
+   "screen_x": 160,
+   "screen_y": 56
+  },
+  {
+   "file": "anim_106_f012.png",
+   "frame": 12,
+   "w": 20,
+   "h": 22,
+   "screen_x": 140,
+   "screen_y": 56
+  },
+  {
+   "file": "anim_107_f012.png",
+   "frame": 12,
+   "w": 22,
+   "h": 24,
+   "screen_x": 160,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_108_f013.png",
+   "frame": 13,
+   "w": 42,
+   "h": 22,
+   "screen_x": 140,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_109_f014.png",
+   "frame": 14,
+   "w": 36,
+   "h": 20,
+   "screen_x": 142,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_110_f015.png",
+   "frame": 15,
+   "w": 36,
+   "h": 16,
+   "screen_x": 142,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_111_f016.png",
+   "frame": 16,
+   "w": 34,
+   "h": 18,
+   "screen_x": 144,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_112_f017.png",
+   "frame": 17,
+   "w": 32,
+   "h": 16,
+   "screen_x": 144,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_113_f018.png",
+   "frame": 18,
+   "w": 30,
+   "h": 18,
+   "screen_x": 146,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_114_f019.png",
+   "frame": 19,
+   "w": 6,
+   "h": 4,
+   "screen_x": 148,
+   "screen_y": 60
+  },
+  {
+   "file": "anim_115_f019.png",
+   "frame": 19,
+   "w": 6,
+   "h": 4,
+   "screen_x": 166,
+   "screen_y": 60
+  },
+  {
+   "file": "anim_116_f020.png",
+   "frame": 20,
+   "w": 28,
+   "h": 16,
+   "screen_x": 146,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_117_f021.png",
+   "frame": 21,
+   "w": 26,
+   "h": 12,
+   "screen_x": 148,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_118_f022.png",
+   "frame": 22,
+   "w": 24,
+   "h": 6,
+   "screen_x": 148,
+   "screen_y": 56
+  },
+  {
+   "file": "anim_119_f023.png",
+   "frame": 23,
+   "w": 24,
+   "h": 14,
+   "screen_x": 148,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_120_f024.png",
+   "frame": 24,
+   "w": 6,
+   "h": 4,
+   "screen_x": 150,
+   "screen_y": 56
+  },
+  {
+   "file": "anim_121_f024.png",
+   "frame": 24,
+   "w": 4,
+   "h": 4,
+   "screen_x": 166,
+   "screen_y": 56
+  },
+  {
+   "file": "anim_122_f025.png",
+   "frame": 25,
+   "w": 22,
+   "h": 10,
+   "screen_x": 150,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_123_f026.png",
+   "frame": 26,
+   "w": 18,
+   "h": 6,
+   "screen_x": 152,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_124_f027.png",
+   "frame": 27,
+   "w": 4,
+   "h": 4,
+   "screen_x": 152,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_125_f027.png",
+   "frame": 27,
+   "w": 4,
+   "h": 4,
+   "screen_x": 166,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_126_f028.png",
+   "frame": 28,
+   "w": 20,
+   "h": 12,
+   "screen_x": 150,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_127_f029.png",
+   "frame": 29,
+   "w": 2,
+   "h": 2,
+   "screen_x": 152,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_128_f029.png",
+   "frame": 29,
+   "w": 2,
+   "h": 4,
+   "screen_x": 156,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_129_f029.png",
+   "frame": 29,
+   "w": 4,
+   "h": 6,
+   "screen_x": 160,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_130_f029.png",
+   "frame": 29,
+   "w": 2,
+   "h": 4,
+   "screen_x": 166,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_131_f030.png",
+   "frame": 30,
+   "w": 2,
+   "h": 2,
+   "screen_x": 152,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_132_f030.png",
+   "frame": 30,
+   "w": 2,
+   "h": 4,
+   "screen_x": 156,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_133_f030.png",
+   "frame": 30,
+   "w": 4,
+   "h": 6,
+   "screen_x": 160,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_134_f030.png",
+   "frame": 30,
+   "w": 2,
+   "h": 4,
+   "screen_x": 166,
+   "screen_y": 54
+  },
+  {
+   "file": "anim_135_f031.png",
+   "frame": 31,
+   "w": 20,
+   "h": 10,
+   "screen_x": 150,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_136_f032.png",
+   "frame": 32,
+   "w": 4,
+   "h": 4,
+   "screen_x": 154,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_137_f032.png",
+   "frame": 32,
+   "w": 4,
+   "h": 4,
+   "screen_x": 164,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_138_f033.png",
+   "frame": 33,
+   "w": 2,
+   "h": 2,
+   "screen_x": 152,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_139_f033.png",
+   "frame": 33,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_140_f033.png",
+   "frame": 33,
+   "w": 8,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_141_f034.png",
+   "frame": 34,
+   "w": 2,
+   "h": 2,
+   "screen_x": 152,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_142_f034.png",
+   "frame": 34,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_143_f034.png",
+   "frame": 34,
+   "w": 8,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_144_f035.png",
+   "frame": 35,
+   "w": 18,
+   "h": 10,
+   "screen_x": 152,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_145_f036.png",
+   "frame": 36,
+   "w": 2,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_146_f036.png",
+   "frame": 36,
+   "w": 4,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_147_f037.png",
+   "frame": 37,
+   "w": 6,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_148_f037.png",
+   "frame": 37,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_149_f037.png",
+   "frame": 37,
+   "w": 2,
+   "h": 2,
+   "screen_x": 166,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_150_f038.png",
+   "frame": 38,
+   "w": 6,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_151_f038.png",
+   "frame": 38,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_152_f038.png",
+   "frame": 38,
+   "w": 2,
+   "h": 2,
+   "screen_x": 166,
+   "screen_y": 52
+  },
+  {
+   "file": "anim_153_f039.png",
+   "frame": 39,
+   "w": 14,
+   "h": 8,
+   "screen_x": 154,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_154_f040.png",
+   "frame": 40,
+   "w": 4,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_155_f040.png",
+   "frame": 40,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_156_f041.png",
+   "frame": 41,
+   "w": 4,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_157_f041.png",
+   "frame": 41,
+   "w": 2,
+   "h": 2,
+   "screen_x": 160,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_158_f041.png",
+   "frame": 41,
+   "w": 2,
+   "h": 2,
+   "screen_x": 166,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_159_f042.png",
+   "frame": 42,
+   "w": 4,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_160_f042.png",
+   "frame": 42,
+   "w": 2,
+   "h": 2,
+   "screen_x": 160,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_161_f042.png",
+   "frame": 42,
+   "w": 2,
+   "h": 2,
+   "screen_x": 166,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_162_f043.png",
+   "frame": 43,
+   "w": 4,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_163_f043.png",
+   "frame": 43,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_164_f044.png",
+   "frame": 44,
+   "w": 4,
+   "h": 2,
+   "screen_x": 154,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_165_f044.png",
+   "frame": 44,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_166_f045.png",
+   "frame": 45,
+   "w": 14,
+   "h": 6,
+   "screen_x": 154,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_167_f046.png",
+   "frame": 46,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_168_f046.png",
+   "frame": 46,
+   "w": 4,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_169_f047.png",
+   "frame": 47,
+   "w": 2,
+   "h": 2,
+   "screen_x": 156,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_170_f047.png",
+   "frame": 47,
+   "w": 4,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_171_f048.png",
+   "frame": 48,
+   "w": 2,
+   "h": 2,
+   "screen_x": 156,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_172_f048.png",
+   "frame": 48,
+   "w": 4,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_173_f049.png",
+   "frame": 49,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_174_f049.png",
+   "frame": 49,
+   "w": 4,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_175_f050.png",
+   "frame": 50,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_176_f050.png",
+   "frame": 50,
+   "w": 4,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_177_f051.png",
+   "frame": 51,
+   "w": 2,
+   "h": 2,
+   "screen_x": 156,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_178_f051.png",
+   "frame": 51,
+   "w": 4,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_179_f052.png",
+   "frame": 52,
+   "w": 2,
+   "h": 2,
+   "screen_x": 156,
+   "screen_y": 50
+  },
+  {
+   "file": "anim_180_f052.png",
+   "frame": 52,
+   "w": 4,
+   "h": 4,
+   "screen_x": 162,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_181_f053.png",
+   "frame": 53,
+   "w": 10,
+   "h": 8,
+   "screen_x": 156,
+   "screen_y": 44
+  },
+  {
+   "file": "anim_182_f054.png",
+   "frame": 54,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_183_f054.png",
+   "frame": 54,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_184_f055.png",
+   "frame": 55,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_185_f055.png",
+   "frame": 55,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_186_f056.png",
+   "frame": 56,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_187_f056.png",
+   "frame": 56,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_188_f057.png",
+   "frame": 57,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_189_f057.png",
+   "frame": 57,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_190_f058.png",
+   "frame": 58,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_191_f058.png",
+   "frame": 58,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_192_f059.png",
+   "frame": 59,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_193_f059.png",
+   "frame": 59,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_194_f060.png",
+   "frame": 60,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_195_f060.png",
+   "frame": 60,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_196_f061.png",
+   "frame": 61,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_197_f061.png",
+   "frame": 61,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_198_f062.png",
+   "frame": 62,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_199_f062.png",
+   "frame": 62,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_200_f063.png",
+   "frame": 63,
+   "w": 2,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_201_f063.png",
+   "frame": 63,
+   "w": 2,
+   "h": 2,
+   "screen_x": 164,
+   "screen_y": 48
+  },
+  {
+   "file": "anim_202_f064.png",
+   "frame": 64,
+   "w": 10,
+   "h": 6,
+   "screen_x": 156,
+   "screen_y": 44
+  },
+  {
+   "file": "anim_203_f065.png",
+   "frame": 65,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_204_f066.png",
+   "frame": 66,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_205_f067.png",
+   "frame": 67,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_206_f068.png",
+   "frame": 68,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_207_f069.png",
+   "frame": 69,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_208_f070.png",
+   "frame": 70,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_209_f071.png",
+   "frame": 71,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_210_f072.png",
+   "frame": 72,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_211_f073.png",
+   "frame": 73,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_212_f074.png",
+   "frame": 74,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_213_f075.png",
+   "frame": 75,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_214_f076.png",
+   "frame": 76,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_215_f077.png",
+   "frame": 77,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_216_f078.png",
+   "frame": 78,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_217_f079.png",
+   "frame": 79,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_218_f080.png",
+   "frame": 80,
+   "w": 2,
+   "h": 2,
+   "screen_x": 162,
+   "screen_y": 46
+  },
+  {
+   "file": "anim_219_f081.png",
+   "frame": 81,
+   "w": 6,
+   "h": 4,
+   "screen_x": 158,
+   "screen_y": 44
+  },
+  {
+   "file": "anim_220_f099.png",
+   "frame": 99,
+   "w": 6,
+   "h": 2,
+   "screen_x": 158,
+   "screen_y": 44
+  }
+ ]
+}

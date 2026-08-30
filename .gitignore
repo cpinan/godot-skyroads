@@ -1,0 +1,6 @@
+# Godot's import cache: regenerated on first open, never committed
+.godot/
+
+# editor and OS noise
+*.tmp
+.DS_Store

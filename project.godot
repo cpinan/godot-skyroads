@@ -1,0 +1,21 @@
+; SkyRoads — Godot 4 port
+; Generated alongside the analysis toolkit in ../analysis.
+config_version=5
+
+[application]
+config/name="SkyRoads"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+run/main_scene="res://scenes/Main.tscn"
+
+[display]
+; The original is 320x200 in mode 13h, displayed at 4:3 — its pixels are 1.2x
+; taller than wide, so the honest design size is 320x240.
+window/size/viewport_width=320
+window/size/viewport_height=240
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0
+

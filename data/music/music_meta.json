@@ -1,0 +1,16 @@
+[
+  {"index": 0, "file": "song_00.wav", "loop_begin_sample": 820260, "length_samples": 9099300, "mix_rate": 44100, "channels": 1},
+  {"index": 1, "file": "song_01.wav", "loop_begin_sample": 335895, "length_samples": 3060540, "mix_rate": 44100, "channels": 1},
+  {"index": 2, "file": "song_02.wav", "loop_begin_sample": 231035, "length_samples": 3254580, "mix_rate": 44100, "channels": 1},
+  {"index": 3, "file": "song_03.wav", "loop_begin_sample": 340550, "length_samples": 4107180, "mix_rate": 44100, "channels": 1},
+  {"index": 4, "file": "song_04.wav", "loop_begin_sample": 0, "length_samples": 4087580, "mix_rate": 44100, "channels": 1},
+  {"index": 5, "file": "song_05.wav", "loop_begin_sample": 360640, "length_samples": 2885120, "mix_rate": 44100, "channels": 1},
+  {"index": 6, "file": "song_06.wav", "loop_begin_sample": 0, "length_samples": 4644710, "mix_rate": 44100, "channels": 1},
+  {"index": 7, "file": "song_07.wav", "loop_begin_sample": 0, "length_samples": 2681280, "mix_rate": 44100, "channels": 1},
+  {"index": 8, "file": "song_08.wav", "loop_begin_sample": 360640, "length_samples": 4688320, "mix_rate": 44100, "channels": 1},
+  {"index": 9, "file": "song_09.wav", "loop_begin_sample": 0, "length_samples": 4713800, "mix_rate": 44100, "channels": 1},
+  {"index": 10, "file": "song_10.wav", "loop_begin_sample": 0, "length_samples": 5034260, "mix_rate": 44100, "channels": 1},
+  {"index": 11, "file": "song_11.wav", "loop_begin_sample": 0, "length_samples": 3945725, "mix_rate": 44100, "channels": 1},
+  {"index": 12, "file": "song_12.wav", "loop_begin_sample": 356230, "length_samples": 5378730, "mix_rate": 44100, "channels": 1},
+  {"index": 13, "file": "song_13.wav", "loop_begin_sample": 0, "length_samples": 5022745, "mix_rate": 44100, "channels": 1}
+]

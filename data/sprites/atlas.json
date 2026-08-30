@@ -1,0 +1,776 @@
+{
+ "stored_cell": {
+  "w": 24,
+  "h": 30,
+  "bytes": 720
+ },
+ "screen_sprite": {
+  "w": 29,
+  "h": 24,
+  "note": "transpose of the stored cell; PICT row 29 is never read"
+ },
+ "exported_as": "screen space",
+ "frames": [
+  {
+   "index": 0,
+   "file": "explosion_00.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 0
+  },
+  {
+   "index": 1,
+   "file": "explosion_01.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 1
+  },
+  {
+   "index": 2,
+   "file": "explosion_02.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 2
+  },
+  {
+   "index": 3,
+   "file": "explosion_03.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 3
+  },
+  {
+   "index": 4,
+   "file": "explosion_04.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 4
+  },
+  {
+   "index": 5,
+   "file": "explosion_05.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 5
+  },
+  {
+   "index": 6,
+   "file": "explosion_06.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 6
+  },
+  {
+   "index": 7,
+   "file": "explosion_07.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 7
+  },
+  {
+   "index": 8,
+   "file": "explosion_08.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 8
+  },
+  {
+   "index": 9,
+   "file": "explosion_09.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 9
+  },
+  {
+   "index": 10,
+   "file": "explosion_10.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 10
+  },
+  {
+   "index": 11,
+   "file": "explosion_11.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 11
+  },
+  {
+   "index": 12,
+   "file": "explosion_12.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 12
+  },
+  {
+   "index": 13,
+   "file": "explosion_13.png",
+   "w": 29,
+   "h": 24,
+   "kind": "explosion",
+   "frame": 13
+  },
+  {
+   "index": 14,
+   "file": "ship_t0_p0_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 0,
+   "flame": 0
+  },
+  {
+   "index": 15,
+   "file": "ship_t0_p0_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 0,
+   "flame": 1
+  },
+  {
+   "index": 16,
+   "file": "ship_t0_p0_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 0,
+   "flame": 2
+  },
+  {
+   "index": 17,
+   "file": "ship_t0_p1_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 1,
+   "flame": 0
+  },
+  {
+   "index": 18,
+   "file": "ship_t0_p1_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 1,
+   "flame": 1
+  },
+  {
+   "index": 19,
+   "file": "ship_t0_p1_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 1,
+   "flame": 2
+  },
+  {
+   "index": 20,
+   "file": "ship_t0_p2_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 2,
+   "flame": 0
+  },
+  {
+   "index": 21,
+   "file": "ship_t0_p2_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 2,
+   "flame": 1
+  },
+  {
+   "index": 22,
+   "file": "ship_t0_p2_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 0,
+   "pitch": 2,
+   "flame": 2
+  },
+  {
+   "index": 23,
+   "file": "ship_t1_p0_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 0,
+   "flame": 0
+  },
+  {
+   "index": 24,
+   "file": "ship_t1_p0_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 0,
+   "flame": 1
+  },
+  {
+   "index": 25,
+   "file": "ship_t1_p0_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 0,
+   "flame": 2
+  },
+  {
+   "index": 26,
+   "file": "ship_t1_p1_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 1,
+   "flame": 0
+  },
+  {
+   "index": 27,
+   "file": "ship_t1_p1_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 1,
+   "flame": 1
+  },
+  {
+   "index": 28,
+   "file": "ship_t1_p1_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 1,
+   "flame": 2
+  },
+  {
+   "index": 29,
+   "file": "ship_t1_p2_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 2,
+   "flame": 0
+  },
+  {
+   "index": 30,
+   "file": "ship_t1_p2_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 2,
+   "flame": 1
+  },
+  {
+   "index": 31,
+   "file": "ship_t1_p2_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 1,
+   "pitch": 2,
+   "flame": 2
+  },
+  {
+   "index": 32,
+   "file": "ship_t2_p0_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 0,
+   "flame": 0
+  },
+  {
+   "index": 33,
+   "file": "ship_t2_p0_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 0,
+   "flame": 1
+  },
+  {
+   "index": 34,
+   "file": "ship_t2_p0_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 0,
+   "flame": 2
+  },
+  {
+   "index": 35,
+   "file": "ship_t2_p1_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 1,
+   "flame": 0
+  },
+  {
+   "index": 36,
+   "file": "ship_t2_p1_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 1,
+   "flame": 1
+  },
+  {
+   "index": 37,
+   "file": "ship_t2_p1_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 1,
+   "flame": 2
+  },
+  {
+   "index": 38,
+   "file": "ship_t2_p2_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 2,
+   "flame": 0
+  },
+  {
+   "index": 39,
+   "file": "ship_t2_p2_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 2,
+   "flame": 1
+  },
+  {
+   "index": 40,
+   "file": "ship_t2_p2_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 2,
+   "pitch": 2,
+   "flame": 2
+  },
+  {
+   "index": 41,
+   "file": "ship_t3_p0_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 0,
+   "flame": 0
+  },
+  {
+   "index": 42,
+   "file": "ship_t3_p0_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 0,
+   "flame": 1
+  },
+  {
+   "index": 43,
+   "file": "ship_t3_p0_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 0,
+   "flame": 2
+  },
+  {
+   "index": 44,
+   "file": "ship_t3_p1_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 1,
+   "flame": 0
+  },
+  {
+   "index": 45,
+   "file": "ship_t3_p1_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 1,
+   "flame": 1
+  },
+  {
+   "index": 46,
+   "file": "ship_t3_p1_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 1,
+   "flame": 2
+  },
+  {
+   "index": 47,
+   "file": "ship_t3_p2_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 2,
+   "flame": 0
+  },
+  {
+   "index": 48,
+   "file": "ship_t3_p2_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 2,
+   "flame": 1
+  },
+  {
+   "index": 49,
+   "file": "ship_t3_p2_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 3,
+   "pitch": 2,
+   "flame": 2
+  },
+  {
+   "index": 50,
+   "file": "ship_t4_p0_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 0,
+   "flame": 0
+  },
+  {
+   "index": 51,
+   "file": "ship_t4_p0_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 0,
+   "flame": 1
+  },
+  {
+   "index": 52,
+   "file": "ship_t4_p0_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 0,
+   "flame": 2
+  },
+  {
+   "index": 53,
+   "file": "ship_t4_p1_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 1,
+   "flame": 0
+  },
+  {
+   "index": 54,
+   "file": "ship_t4_p1_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 1,
+   "flame": 1
+  },
+  {
+   "index": 55,
+   "file": "ship_t4_p1_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 1,
+   "flame": 2
+  },
+  {
+   "index": 56,
+   "file": "ship_t4_p2_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 2,
+   "flame": 0
+  },
+  {
+   "index": 57,
+   "file": "ship_t4_p2_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 2,
+   "flame": 1
+  },
+  {
+   "index": 58,
+   "file": "ship_t4_p2_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 4,
+   "pitch": 2,
+   "flame": 2
+  },
+  {
+   "index": 59,
+   "file": "ship_t5_p0_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 0,
+   "flame": 0
+  },
+  {
+   "index": 60,
+   "file": "ship_t5_p0_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 0,
+   "flame": 1
+  },
+  {
+   "index": 61,
+   "file": "ship_t5_p0_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 0,
+   "flame": 2
+  },
+  {
+   "index": 62,
+   "file": "ship_t5_p1_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 1,
+   "flame": 0
+  },
+  {
+   "index": 63,
+   "file": "ship_t5_p1_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 1,
+   "flame": 1
+  },
+  {
+   "index": 64,
+   "file": "ship_t5_p1_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 1,
+   "flame": 2
+  },
+  {
+   "index": 65,
+   "file": "ship_t5_p2_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 2,
+   "flame": 0
+  },
+  {
+   "index": 66,
+   "file": "ship_t5_p2_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 2,
+   "flame": 1
+  },
+  {
+   "index": 67,
+   "file": "ship_t5_p2_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 5,
+   "pitch": 2,
+   "flame": 2
+  },
+  {
+   "index": 68,
+   "file": "ship_t6_p0_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 0,
+   "flame": 0
+  },
+  {
+   "index": 69,
+   "file": "ship_t6_p0_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 0,
+   "flame": 1
+  },
+  {
+   "index": 70,
+   "file": "ship_t6_p0_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 0,
+   "flame": 2
+  },
+  {
+   "index": 71,
+   "file": "ship_t6_p1_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 1,
+   "flame": 0
+  },
+  {
+   "index": 72,
+   "file": "ship_t6_p1_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 1,
+   "flame": 1
+  },
+  {
+   "index": 73,
+   "file": "ship_t6_p1_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 1,
+   "flame": 2
+  },
+  {
+   "index": 74,
+   "file": "ship_t6_p2_f0.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 2,
+   "flame": 0
+  },
+  {
+   "index": 75,
+   "file": "ship_t6_p2_f1.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 2,
+   "flame": 1
+  },
+  {
+   "index": 76,
+   "file": "ship_t6_p2_f2.png",
+   "w": 29,
+   "h": 24,
+   "kind": "ship",
+   "tilt": 6,
+   "pitch": 2,
+   "flame": 2
+  }
+ ],
+ "index_formula": "14 + 9*tilt + 3*pitch + flame",
+ "tilt": "clamp((x / 0x80 - 95) / 46, 0, 6) \u2014 the ship's lane",
+ "pitch": {
+  "0": "level",
+  "1": "nose up (yvel >= 355)",
+  "2": "nose down (yvel <= -355 or below the deck); forced to 0 inside a tunnel"
+ },
+ "flame_table": [
+  0,
+  1,
+  2,
+  1
+ ],
+ "flame_index": "(tick / 2) & 3, forced 0 when out of fuel",
+ "draw_origin": {
+  "left": "x / 0x80 + SHIP_PAN[tilt] - 0x6e",
+  "top": "157 - y / 0x80 (1 px lower on sticky floors)"
+ },
+ "palette_base": 72
+}

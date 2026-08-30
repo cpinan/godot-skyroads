@@ -1,0 +1,243 @@
+[
+ {
+  "index": 0,
+  "role": "title/intro",
+  "instruments": 9,
+  "events": 6087,
+  "loop_seconds": 206.31,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   6,
+   7,
+   9,
+   10
+  ]
+ },
+ {
+  "index": 1,
+  "role": "menu",
+  "instruments": 8,
+  "events": 1544,
+  "loop_seconds": 69.39,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   10
+  ]
+ },
+ {
+  "index": 2,
+  "role": "gameplay",
+  "instruments": 8,
+  "events": 3096,
+  "loop_seconds": 73.79,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ]
+ },
+ {
+  "index": 3,
+  "role": "gameplay",
+  "instruments": 7,
+  "events": 2355,
+  "loop_seconds": 93.12,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   10
+  ]
+ },
+ {
+  "index": 4,
+  "role": "gameplay",
+  "instruments": 9,
+  "events": 2357,
+  "loop_seconds": 92.68,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ]
+ },
+ {
+  "index": 5,
+  "role": "gameplay",
+  "instruments": 7,
+  "events": 2322,
+  "loop_seconds": 65.42,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   10
+  ]
+ },
+ {
+  "index": 6,
+  "role": "gameplay",
+  "instruments": 8,
+  "events": 2243,
+  "loop_seconds": 105.31,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   6,
+   7,
+   10
+  ]
+ },
+ {
+  "index": 7,
+  "role": "gameplay",
+  "instruments": 9,
+  "events": 2680,
+  "loop_seconds": 60.79,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ]
+ },
+ {
+  "index": 8,
+  "role": "gameplay",
+  "instruments": 8,
+  "events": 3689,
+  "loop_seconds": 106.3,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ]
+ },
+ {
+  "index": 9,
+  "role": "gameplay",
+  "instruments": 8,
+  "events": 3899,
+  "loop_seconds": 106.88,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ]
+ },
+ {
+  "index": 10,
+  "role": "gameplay",
+  "instruments": 9,
+  "events": 3439,
+  "loop_seconds": 114.14,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   10
+  ]
+ },
+ {
+  "index": 11,
+  "role": "gameplay",
+  "instruments": 8,
+  "events": 2128,
+  "loop_seconds": 89.46,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   10
+  ]
+ },
+ {
+  "index": 12,
+  "role": "gameplay",
+  "instruments": 9,
+  "events": 2876,
+  "loop_seconds": 121.95,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   10
+  ]
+ },
+ {
+  "index": 13,
+  "role": "gameplay",
+  "instruments": 8,
+  "events": 2633,
+  "loop_seconds": 113.88,
+  "channels": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   10
+  ]
+ }
+]

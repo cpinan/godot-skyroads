@@ -1,0 +1,24 @@
+{
+ "format": "3 bytes per tick: steer+1, accel+1, jump",
+ "note": "A route is a proof the road is completable. Its absence is a search failure, not a proof of impossibility.",
+ "routes": [
+  {
+   "road": 1,
+   "solved": true,
+   "ticks": 462,
+   "seconds": 12.83,
+   "furthest_row": 55,
+   "rows": 55,
+   "note": "completed in 462 ticks"
+  },
+  {
+   "road": 30,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 15.98,
+   "rows": 200,
+   "note": "every branch died"
+  }
+ ]
+}

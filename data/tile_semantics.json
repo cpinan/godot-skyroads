@@ -1,0 +1,91 @@
+{
+ "word_layout": {
+  "bits_0_3": "ground surface type / colour (0 = void)",
+  "bits_4_7": "block-top surface type / colour",
+  "bits_8_11": "block geometry",
+  "bits_12_15": "unused (0 in all 31 retail roads)"
+ },
+ "geometry": {
+  "0": "flat",
+  "1": "tunnel",
+  "2": "block_half",
+  "3": "block_half_bore",
+  "4": "block_full",
+  "5": "block_full_bore"
+ },
+ "geometry_top_y": {
+  "0": 10240,
+  "1": 12800,
+  "2": 12800,
+  "3": 12800,
+  "4": 15360,
+  "5": 15360
+ },
+ "surface_effects": {
+  "0": "void",
+  "2": "sticky",
+  "8": "ice",
+  "9": "supplies",
+  "10": "boost",
+  "12": "burning"
+ },
+ "effect_details": {
+  "sticky": {
+   "speed_per_tick": -303,
+   "lateral_bonus_removed": true,
+   "ship_sinks_px": 1
+  },
+  "ice": {
+   "steering_frozen": true
+  },
+  "supplies": {
+   "refill_to": 30000,
+   "sfx_below": 27000
+  },
+  "boost": {
+   "speed_per_tick": 303
+  },
+  "burning": {
+   "kills": true,
+   "result_code": 2
+  }
+ },
+ "road_palette_layout": {
+  "floor": [
+   1,
+   14
+  ],
+  "floor_front": [
+   16,
+   29
+  ],
+  "side_left": [
+   31,
+   45
+  ],
+  "side_right": [
+   46,
+   60
+  ],
+  "block_default": [
+   61,
+   61
+  ],
+  "block_top": [
+   62,
+   62
+  ],
+  "block_side": [
+   63,
+   64
+  ],
+  "tunnel_wall": [
+   65,
+   67
+  ],
+  "tunnel_arch": [
+   68,
+   73
+  ]
+ }
+}
