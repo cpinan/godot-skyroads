@@ -49,8 +49,59 @@ func _init() -> void:
 		check(frac <= MAX_DIFF_FRACTION,
 			"dashboard at tick %d matches the C reference (%.3f%% differ)"
 			% [tick, frac * 100.0])
+	await _jump_o_master()
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
+
+
+## The JUMP-O-MASTER reads IDLE / IN USE, and the two are a stencil swap in
+## the same 26x5 cell — so a break here is silent: the panel keeps showing a
+## word, just always the same one. Reported by a player as "it always says
+## IDLE", which turned out to be correct behaviour (the landing assist is
+## only engaged about 6% of ticks) rather than a fault. This pins the swap so
+## that if it ever DOES break, the reason is known.
+func _jump_o_master() -> void:
+	var road := RoadData.load_json("res://data/levels/road_01.json")
+	if road == null:
+		check(false, "road 1 loads")
+		return
+	var cl := CanvasLayer.new()
+	get_root().add_child(cl)
+	var art := TextureRect.new()
+	art.texture = load("res://data/gfx/dashbrd_0.png")
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_SCALE
+	art.position = Vector2(0, SkyRoads.DASH_PICT_Y * SkyRoads.PIXEL_ASPECT)
+	art.size = Vector2(SkyRoads.SCREEN_W,
+		(SkyRoads.SCREEN_H - SkyRoads.DASH_PICT_Y) * SkyRoads.PIXEL_ASPECT)
+	cl.add_child(art)
+	var dash := Dashboard.new()
+	cl.add_child(dash)
+	await process_frame
+
+	var shot: Array[Image] = []
+	for state in [0, 1]:
+		var play := SkyRoadsPlay.new(road)
+		play.ap_light = state
+		dash.update(play, road.rows)
+		for _i in 3:
+			await process_frame
+		RenderingServer.force_draw()
+		RenderingServer.force_draw()
+		shot.append(get_root().get_texture().get_image())
+	cl.queue_free()
+	await process_frame
+
+	var differ := 0
+	var a := shot[0]
+	var b := shot[1]
+	for y in a.get_height():
+		for x in a.get_width():
+			if not a.get_pixel(x, y).is_equal_approx(b.get_pixel(x, y)):
+				differ += 1
+	print("  jump-o-master   IDLE vs IN USE differ by %d px" % differ)
+	check(differ > 50,
+		"the landing-assist readout changes with ap_light (%d px)" % differ)
 
 
 func _compare(dir: String, tick: int) -> float:
