@@ -1335,10 +1335,22 @@ extents — the comment there says so. `tools/dump_bands.c archlines` prints the
 exact painted mask per record, so the boundaries can be taken from the data
 instead of fitted. Worth about 2 points if it lands.
 
-**`0 -> 61` deserves a look before the rest.** 119 pixels where the original
-paints nothing at all and the port paints a block top is not a boundary error;
-it is geometry that should not be there. Small, but it is the only entry in
-this table that is a drawing fault rather than a placement one.
+**`0 -> 61` was looked at, and it is not a discrete bug.** All 119 pixels sit
+in rows 65..72 at x 229..316 — a wedge that widens with each row, hard against
+the horizon on the right. That is not a cell being drawn that should not be;
+it is the far end of the visibility window projecting a few pixels higher than
+the original does, which puts it with #28 (the camera is a vertical pinhole at
+B=2.550 AND a horizontal cone through y=32) rather than with the geometry. Not
+worth chasing on its own.
+
+**The arch bands are the real target, and they are harder than the note above
+suggests.** The four records OVERLAP rather than tiling the lane — at dr7/ci0
+they span x[15..69], [22..79], [33..84], [40..86] — because each paints over
+the one before, so a band's VISIBLE extent ends where the next record starts,
+not where its own does. Deriving the boundaries means walking that paint order
+per column, not reading extents off `archlines`. Left undone deliberately:
+this document already records three parity "improvements" that measured worse,
+and a fit that looks obvious is exactly how those happened.
 
 Nothing in this section is fixed yet. It is here so the next attempt starts
 from a ranked list, and because "the residual is ~10%" is not a finding.
