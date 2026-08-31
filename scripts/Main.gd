@@ -28,6 +28,7 @@ var _in_game := false
 # frame capture
 var _shot_dir := ""
 var _shot_at: Array[int] = []
+var _shot_alpha := -1.0
 var _shot_every := 0
 var _pending_shot := -1
 var _owed: Array[int] = []
@@ -90,6 +91,7 @@ func _ready() -> void:
 	_shot_at = opt.shot_ticks.duplicate()
 	_owed = opt.shot_ticks.duplicate()
 	_shot_every = opt.shot_every
+	_shot_alpha = opt.shot_alpha
 	_roadend_shot = opt.roadend_shot
 	_force_final = opt.force_final
 	_autodump = opt.autodump
@@ -387,6 +389,10 @@ func _begin(index: int) -> void:
 	add_child(_loop)
 	_loop.finished.connect(_on_finished)
 	_loop.ticked.connect(_on_tick)
+	# A capture must be of the tick it is named after, so the catch-up loop
+	# stops on those ticks instead of running past them.
+	if not _shot_dir.is_empty():
+		_loop.halt_ticks = _shot_at.duplicate()
 	_loop.start(_road)
 	if _replaying:
 		_apply_replay_input(_loop.play)
@@ -475,6 +481,14 @@ func _capture_pending() -> void:
 	# Awaiting frame_post_draw deadlocks whenever the compositor has suspended
 	# the window — which on macOS is any run that is not frontmost, i.e. every
 	# automated one.
+	# Take the shot at a REPRODUCIBLE moment inside the tick. Without this the
+	# fraction is whatever the frame that noticed the tick happened to be at,
+	# which is why the same build measured 18.5% and 20.0% on road 2 t=640 in
+	# consecutive runs — see BUGS #29b and §12.3 for the sweep that chose the
+	# default.
+	if _shot_alpha >= 0.0 and _loop != null and _loop.play != null:
+		_loop.override_alpha(_shot_alpha)
+		_present()
 	RenderingServer.force_draw()
 	var img := get_viewport().get_texture().get_image()
 	var path := "%s/road%02d_t%04d.png" % [_shot_dir, road_index, tick]
@@ -573,6 +587,15 @@ func _unhandled_input(ev: InputEvent) -> void:
 				_fade_transition(_open_menu.bind(Menu.Screen.GO))
 			else:
 				_loop.paused = false
+			return
+		# The developer keys are inert while frames are being captured. Every
+		# one of them either paints over the picture being measured or stalls
+		# the loop, so a single stray keystroke into a focused capture window
+		# invalidates the run — which is exactly what happened on 2026-08-31:
+		# an `r` typed while the gate had focus dumped a recording at tick 15
+		# and left its toast across road 5's sky, and `render_backdrop.gd`
+		# reported 571 wrong pixels in a band the renderer had not touched.
+		if not _shot_dir.is_empty() and key != KEY_ESCAPE:
 			return
 		match key:
 			KEY_ESCAPE:

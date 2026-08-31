@@ -18,6 +18,12 @@ enum Mode {
 	MENU_SHOT,   ## --menu-shot: capture menu screens and exit
 }
 
+## The interpolation fraction a parity capture is taken at: 0.0 is the state
+## exactly on the tick, which is what the reference draws a frame FOR. Set
+## from the sweep in BUGS §12.3; negative restores the old behaviour, which
+## was "whatever fraction the frame that noticed the tick happened to be at".
+const SHOT_ALPHA_DEFAULT := 0.0
+
 var mode: int = Mode.MENU
 var road_index := 1
 
@@ -25,6 +31,10 @@ var road_index := 1
 var shot_dir := ""
 var shot_ticks: Array[int] = []
 var shot_every := 0
+## Where inside the tick the capture is taken, 0.0 = on the tick, 1.0 = a
+## whole tick later. Negative means "wherever the frame happened to land",
+## which is what every capture did before it was measured — see BUGS #29b.
+var shot_alpha := SHOT_ALPHA_DEFAULT
 var roadend_shot := false
 var force_final := false
 var menu_shot := ""
@@ -99,6 +109,10 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 			"--final-shot":
 				o.roadend_shot = true
 				o.force_final = true
+			"--shot-alpha":
+				if not value.is_empty():
+					o.shot_alpha = value.to_float()
+					consumed = true
 			"--record":
 				o.autodump = true
 			"--collision-overlay":

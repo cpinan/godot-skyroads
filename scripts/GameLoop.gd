@@ -83,6 +83,15 @@ func view_row() -> float:
 	return (float(play.z) + (float(play.z) - float(prev_z)) * a) / 65536.0
 
 
+## Pin the interpolation fraction for the next presentation. Only a parity
+## capture uses this: it is the difference between a shot taken at a
+## reproducible moment inside the tick and one taken wherever the frame that
+## noticed the shot tick happened to land (BUGS #29b). The next step()
+## recomputes _alpha from the accumulator, so nothing has to put it back.
+func override_alpha(a: float) -> void:
+	_alpha = a
+
+
 func view_x() -> int:
 	return int(round(float(play.x) + (float(play.x) - float(prev_x)) * _alpha))
 
@@ -91,9 +100,14 @@ func view_y() -> int:
 	return int(round(float(play.y) + (float(play.y) - float(prev_y)) * _alpha))
 
 
-## Present the simulated state exactly, with no carry-forward. Used by the
-## capture path so a screenshot corresponds to one tick rather than to a
-## moment between two.
+## Ticks the catch-up loop must not run past. A frame that owes several ticks
+## would otherwise simulate all of them and leave the capture path looking at
+## tick N+k while it believes it is looking at tick N — BUGS #29b, and the
+## reason the same build measured 18.5% and 20.0% on consecutive runs. The
+## debt is not dropped, only deferred: the next frame catches it up.
+var halt_ticks: Array[int] = []
+
+
 func _process(delta: float) -> void:
 	if not running or paused:
 		return
@@ -118,6 +132,8 @@ func _process(delta: float) -> void:
 			running = false
 			finished.emit(last_result)
 			return
+		if halt_ticks.has(play.tick):
+			break
 	if _acc > per_tick:
 		# leftover debt beyond the budget is dropped, so _alpha stays in
 		# [0,1] and presentation never extrapolates past the simulated state
