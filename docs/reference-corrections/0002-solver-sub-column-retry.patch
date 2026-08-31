@@ -1,0 +1,115 @@
+--- a/sra/solver.py
++++ b/sra/solver.py
+@@ -49,24 +49,43 @@
+                      for b in (st + 1, ac + 1, jp))
+ 
+ 
+-def _key(s: sim.Sim, col_bits: int = 1) -> tuple:
++def _key(s: sim.Sim, col_bits: int = 1, sub_column_bits: int = 0) -> tuple:
+     """Coarse state signature for de-duplication.
+ 
+     Two states that agree on grid cell, rounded speed, grounded-ness and the
+     sign of the lateral drift will play out almost identically, so keeping
+     both wastes beam width.
++
++    `sub_column_bits` keeps `s.x >> bits` as well, which splits each column
++    into sub-positions. A column is 0x2E * 0x80 x-units wide and a TUNNEL BORE
++    IS NARROWER THAN THAT, so without it "centred in column 5" and "scraping
++    the edge of column 5" are one niche and only one survives — and if the
++    survivor is the off-centre one the bore can never be entered. No beam width
++    fixes that, because the merge happens before selection: on road 6, 8192
++    slots failed exactly as 1024 did, and 9 bits of sub-column solved it at
++    1024.
++
++    It is not a free win and is off by default. Splitting niches gives each one
++    fewer slots at a fixed beam, so it also LOSES roads: measured over all 30
++    on 2026-08-31 it won 6, 8 and 25 and lost 5, 14 and 24. The two settings
++    are complementary rather than ordered, which is why `sra solve` runs the
++    plain pass and retries only the failures with this one. That is sound
++    because the search is authoritative in one direction only — a route found
++    is a proof, since it is replayed from scratch to confirm.
+     """
+     col = (s.x // 0x80 - 0x5F) // 0x2E
+-    return (s.z >> 16, col >> (col_bits - 1) if col_bits > 1 else col,
+-            s.speed // 0x400, s.on_ground, s.jumping,
+-            (s.side_push > 0) - (s.side_push < 0))
++    k = (s.z >> 16, col >> (col_bits - 1) if col_bits > 1 else col,
++         s.speed // 0x400, s.on_ground, s.jumping,
++         (s.side_push > 0) - (s.side_push < 0))
++    return k + (s.x >> sub_column_bits,) if sub_column_bits else k
+ 
+ 
+ MIN_USEFUL_BEAM = 8     # 7 lanes x grounded/airborne = 14 niches to cover
+ 
+ 
+ def solve(road: Road, beam: int = 48, hold: int = 3,
+-          max_ticks: int = 6000, patience: int = 400) -> Route:
++          max_ticks: int = 6000, patience: int = 400,
++          sub_column_bits: int = 0) -> Route:
+     """Beam search for an input script that completes `road`.
+ 
+     The beam is filled round-robin across niches keyed by lane and whether the
+@@ -105,7 +124,7 @@
+                     continue                    # died on this branch
+                 if s.tick > max_ticks:
+                     continue
+-                k = _key(s)
++                k = _key(s, sub_column_bits=sub_column_bits)
+                 if k in seen:
+                     continue
+                 seen.add(k)
+--- a/sra/cli.py
++++ b/sra/cli.py
+@@ -252,16 +252,33 @@
+         out.mkdir(parents=True, exist_ok=True)
+     results = []
+     for road in targets:
+-        route = solver_mod.solve(road, beam=args.beam, hold=args.hold,
+-                                 max_ticks=args.max_ticks)
+-        ok, msg = (solver_mod.verify(road, route) if route.solved
+-                   else (False, route.reason))
++        # Two passes. The plain key and the sub-column key are complementary,
++        # not ordered — over all 30 roads the second wins 6, 8 and 25 and
++        # loses 5, 14 and 24 — so a road that fails the first is retried with
++        # the second rather than the first being replaced. Keeping whichever
++        # succeeds is sound because the search is authoritative in one
++        # direction only: a route found is a proof, since verify() replays it
++        # from scratch.
++        passes = [0] if args.sub_column is not None and args.sub_column == 0 \
++            else [0, args.sub_column if args.sub_column else 9]
++        for attempt, bits in enumerate(passes):
++            route = solver_mod.solve(road, beam=args.beam, hold=args.hold,
++                                     max_ticks=args.max_ticks,
++                                     sub_column_bits=bits)
++            ok, msg = (solver_mod.verify(road, route) if route.solved
++                       else (False, route.reason))
++            if route.solved and ok:
++                break
++            if attempt + 1 < len(passes):
++                print(f'road {road.index:>2}  retrying with '
++                      f'--sub-column {passes[attempt + 1]} ({msg})')
+         results.append((road, route, ok, msg))
+         status = 'SOLVED' if route.solved and ok else (
+             'FOUND BUT REPLAY FAILED' if route.solved else 'unsolved')
++        via = f' [sub-column {bits}]' if bits else ''
+         print(f'road {road.index:>2}  g{road.gravity:<3} {road.rows:>3} rows  '
+               f'{status:<24} furthest row {route.rows_reached:>6.1f}/'
+-              f'{road.rows}  {msg}')
++              f'{road.rows}  {msg}{via}')
+         if out and route.solved and ok:
+             (out / f'road_{road.index:02d}.bin').write_bytes(
+                 route.as_input_bytes())
+@@ -1190,6 +1207,13 @@
+     s.add_argument('road', type=int, nargs='?', default=None,
+                    help='road index; omit to try every road')
+     s.add_argument('--beam', type=int, default=48)
++    s.add_argument('--sub-column', type=int, default=None, metavar='BITS',
++                   help='bits of sub-column position kept in the de-dup key '
++                        'on the RETRY pass (default 9; 0 disables the retry). '
++                        'A tunnel bore is narrower than a column, so without '
++                        'this every lateral position in one collapses to a '
++                        'single niche and an off-centre survivor can never '
++                        'enter the bore')
+     s.add_argument('--hold', type=int, default=3,
+                    help='ticks each action is held before branching again')
+     s.add_argument('--max-ticks', type=int, default=6000)

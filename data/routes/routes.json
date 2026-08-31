@@ -1,8 +1,8 @@
 {
  "format": "3 bytes per tick: steer+1, accel+1, jump",
  "note": "A route is a proof the road is completable. Its absence is a search failure, not a proof of impossibility.",
- "solver": "analysis/sra.py solve --beam 64 --max-ticks 8000; the roads that failed there were retried at --beam 256 --hold 2 --max-ticks 12000; road 4 fell to --beam 1024 --hold 1 --max-ticks 16000 on 2026-08-31, where --beam 256 --hold 2 had left it at row 50/94. The other fourteen still fail at that width",
- "solved": 16,
+ "solver": "analysis/sra.py solve --beam 64 --max-ticks 8000; the roads that failed there were retried at --beam 256 --hold 2 --max-ticks 12000. On 2026-08-31 the whole set was re-run at --beam 1024 --hold 1 --max-ticks 16000, which won road 4, and `sra solve` gained a second pass that keeps sub-column position in the de-dup key (--sub-column 9), which won roads 6, 8 and 25. The two passes are complementary, not ordered: the sub-column key also LOSES roads 5, 14 and 24, so it is a retry rather than a new default. See docs/reference-corrections/0002-solver-sub-column-retry.patch",
+ "solved": 19,
  "total": 30,
  "routes": [
   {
@@ -52,12 +52,12 @@
   },
   {
    "road": 6,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 10.0,
+   "solved": true,
+   "ticks": 414,
+   "seconds": 11.5,
+   "furthest_row": 48.0,
    "rows": 48,
-   "note": "every branch died"
+   "note": "completed in 414 ticks"
   },
   {
    "road": 7,
@@ -70,12 +70,12 @@
   },
   {
    "road": 8,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 64.4,
+   "solved": true,
+   "ticks": 780,
+   "seconds": 21.67,
+   "furthest_row": 106.0,
    "rows": 106,
-   "note": "every branch died"
+   "note": "completed in 780 ticks"
   },
   {
    "road": 9,
@@ -223,12 +223,12 @@
   },
   {
    "road": 25,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 61.4,
+   "solved": true,
+   "ticks": 1032,
+   "seconds": 28.67,
+   "furthest_row": 150.0,
    "rows": 150,
-   "note": "every branch died"
+   "note": "completed in 1032 ticks"
   },
   {
    "road": 26,
