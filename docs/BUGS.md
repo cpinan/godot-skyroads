@@ -494,7 +494,7 @@ re-checked. Baseline: `tools/verify.sh` all 117 checks green before and after.
 > | 28 | **FOUND + FIXED 2026-08-30 (STAGE Y)** — the generated camera constants were wrong: BEHIND_ROWS a full row too big (3.535 vs the true 2.550), and DOS's horizontal mapping is a separate straight-line cone through y=32 that no pinhole reproduces. This was "the collisions are offset": world drawn misaligned against the DOS-exact ship blit at every depth. Fixed in `SkyRoadsCamera.gd` (new constants + `make_dos_material` vertex-shader warp on every road/overlay material, `dos_x_scale` for CPU-side label anchors). Derivation in the file header; measurement tools `tools/dump_bands.c`, `tools/replay_frames.c`; evidence in §1. The old §1.1 candidate #2 ("sprite vs collision vertically, diverges ~20% at altitude") was this same defect. |
 > | 29 | **CLOSED 2026-08-30 (STAGE Z3) — the premise was wrong, and the symptom is fixed.** There is no per-row or near-field darkening anywhere in the DOS renderer. Proven directly: drive the C engine over a synthetic road whose every tile is the same code (0x0003) and read the palette index down the middle of the screen — it is index 3 at every distance from the horizon to the deck line, with no remap. Nothing in render.c or tables.c applies one either; `fill_record` resolves a colour through `sr_quad[k][half]` and half is the screen SIDE, not the depth. What the evidence composite actually showed was the block top/front colour swap (#24): road 26's near geometry is a big block, and the port was painting its front with the top's colour. Fixed in STAGE Z2; road 26's shading now tracks the reference at every sampled tick. Evidence `docs/parity/z3_road26_before_after.png`. |
 > | 29b | OPEN, small, found while closing #29: road 26 still differs on ~17% of its solid road pixels, and the confusion is dominated by C index 3 -> port index 1 — two dark greys ONE PALETTE STEP APART, i.e. the port painting an adjacent ROW's colour. Road 26 is the one level that makes this visible, because its consecutive rows are a colour ramp (rows 31-40 run 15,15,3 / 15,3,4 / 15,4,5 / …), so a sub-tick difference in presented depth repaints whole bands from the neighbouring row. It is the residue of comparing an interpolating renderer against a tick-exact one, not a drawing fault. **Three fixes were tried and all measured WORSE — do not repeat them:** presenting the capture at alpha=0 (road 2: 6.5% -> 8.0%), stopping the catch-up loop on the scheduled tick so the shot is of that tick rather than tick N+k (-> 8.5%), and both together. The reference's frame for a tick corresponds to a moment this engine reaches PART-WAY through its own, so the interpolated, end-of-frame state is the closer match. Recorded in `Main._capture_pending`. |
-> | 29c | OPEN, small, found while closing #29: on a tun_high cell (geometry nibble 5) the masonry tier's front stops flat at half-block height while the reference's runs down onto the arch, leaving a sliver of the vault's outer surface showing — measured on an isolated tile as the tier ending 5 screen rows early at the bore's centre. Recipe: a synthetic road of 0x0003 with 0x053f at rows 20-23 column 3, driven with a held-accelerate route, compared at t=170/178. A per-slice fix bounding the tier front by ARCH_OUTER_PX closed it on the isolated tile but REGRESSED road 2 (t=640: 9.9% -> 16.7%), so it was reverted; the tier's true lower bound is not ARCH_OUTER_PX and has not been derived. |
+> | 29c | **CLOSED 2026-08-31 — see §12.1.** The tier has no lower bound to derive: below it the original paints the kind-3 front, not the vault. Original entry follows. OPEN, small, found while closing #29: on a tun_high cell (geometry nibble 5) the masonry tier's front stops flat at half-block height while the reference's runs down onto the arch, leaving a sliver of the vault's outer surface showing — measured on an isolated tile as the tier ending 5 screen rows early at the bore's centre. Recipe: a synthetic road of 0x0003 with 0x053f at rows 20-23 column 3, driven with a held-accelerate route, compared at t=170/178. A per-slice fix bounding the tier front by ARCH_OUTER_PX closed it on the isolated tile but REGRESSED road 2 (t=640: 9.9% -> 16.7%), so it was reverted; the tier's true lower bound is not ARCH_OUTER_PX and has not been derived. |
 > | 29-old | **CLOSED 2026-08-30 — same premise as #29, disproven by the same measurement.** This entry and #29 are one claim: that the C reference darkens near rows and the port does not. #29's direct test settled it — driving the C engine over a synthetic road of one tile code and reading the palette index down the middle of the screen gives index 3 at every distance, horizon to deck line, with no remap anywhere in `render.c` or `tables.c`. There is no near-field darkening to model, on road 26 or anywhere else. The darkness the composite showed was the block top/front colour swap (#24), fixed in STAGE Z2. Nothing to do; kept for the audit trail because "two entries, one wrong premise" is a shape that recurs. |
 > | 34 | **FIXED 2026-08-30 (user report: "UI bugs in the player speed and UI")** — one root cause behind four symptoms. The DOS screen is a single opaque framebuffer: the world picture fills rows 0..137, the dashboard is STAMPED over rows 129..199 skipping its index-0 pixels, and the road is composed into rows 32..137 ONLY, so every transparent dashboard pixel below row 137 shows palette index 0, i.e. black. In the port the 3D viewport covers the whole window, so the live road bled through the dashboard art's transparent pixels — through the GRAV-O-METER digits, the JUMP-O-MASTER panel, the unlit side of the SPEEDOMETER and the bottom corners — and changed hue as the player drove between worlds. Fixed with an opaque black band behind the dashboard from row 138 down. Dashboard parity vs the C engine on the user's road-2 recording went from ~800 differing pixels per frame to **0 across every frame sampled**. This subsumes #30b, which was recorded as "corner speckle" but was the whole band. Tripwire: `tests/render_dashboard.gd` compares the band against C reference frames. |
 > | 35 | **FIXED 2026-08-30 (user report: "also in game menu")** — same family. Every DOS menu begins with `sr_fb_clear(fb, 0)`, so index 0 is BLACK; the exports carry it as alpha 0 (INTRO.LZS alone has 15109 such pixels) and Godot's own grey clear colour showed through, mottling the main menu's night sky. Fixed with an opaque black ground behind every menu screen. |
@@ -966,3 +966,262 @@ view, and the view's job is to persist — so the suite wrote
 `user://skyroads.cfg`, flattening the sound flag and thirty completion
 counters. `Config` now has an overridable `path` and every test points it at a
 scratch file. **Any new suite that reaches a commit path must do the same.**
+
+---
+
+## 12. 2026-08-31 — the gameplay composer, read out of the EXE
+
+§11 measured the SHELL against the retail binary and left the gameplay
+composer untouched. This section is the first pass over it, by the same
+method: disassemble `SKYROADS.EXE` with capstone (code image at
+`hdrpar * 16`, the u16 at EXE offset 8; addresses code-segment relative; data
+segment paragraph `0x66E`) and decode the TREKDAT span records the composer
+consumes with `tools/dump_bands.c kindlines <slot>`.
+
+### How the composer is actually built
+
+`fn_2d03` is the frame composer. It walks 11 direction rows x 4 columns x 2
+halves, and for each cell dispatches on the cell's geometry nibble through a
+**16-entry table at `ds:0x0b7f`**:
+
+| nibble | handler | what it is |
+|---|---|---|
+| 0 | `0x2e50` | the deck slab, plus a skirt at each side that only appears where the neighbouring cell is empty (colour +0x1e and +0x0f) |
+| 1 | `0x303d` | the tunnel: mouth wall at `0x43`, then the six kind-4 arch records, plus two rims at the mouth |
+| 2 | `0x2e9f` | low block |
+| 3 | `0x2ee1` | low block with a bore |
+| 4 | `0x2f3c` | full-height block |
+| 5 | `0x2fb0` | tun_high |
+| 6..15 | `0x3aad` | nothing |
+
+Records are a cursor, not an index: `[si]` is the colour byte of the record
+about to be drawn, `call [0xe4c]` draws it and advances, and `0x31b5`
+(`si += 3` until `0xff`, then `si++`) advances past one without drawing. The
+directory at `di` gives 6 entry points per cell, 12 bytes apart, which is the
+`dir[slot*2]` that `dump_bands.c` already reads.
+
+### 12.1 — a tun_high is a bored full-height block, not a tunnel with a tier
+
+**What the original does.** `0x2fb0` is `0x2f3c`, the full block, with one
+substitution. Where the full block draws the plain lower front, the tun_high
+draws the bore interior and the kind-3 PAIR that splits that front around it:
+
+```
+0x2f3c (kind 4)                     0x2fb0 (kind 5)
+  compose_floor                       compose_floor
+  nearer<2: seek 3, fill              nearer<2: seek 1, fill 0x41
+                                      nearer<2: seek 3, skip, fill, fill
+  seek 2, skip, inner<2: fill         seek 2, skip, inner<2: fill
+  seek 5, fill blockcolor             seek 5, fill blockcolor
+    inner<4 ? fill : skip               inner<4 ? fill : skip
+    nearer<4: fill                      nearer<4: fill
+```
+
+`0x2fb0` never loads `[di+8]`, so **none of the six kind-4 arch records a
+plain tunnel paints appear on a tun_high at all.**
+
+**What the port did.** It drew a full tunnel — arch gradient and all — and
+stood a block on top of it whose front stopped flat at half-block height. It
+did that because `skyroads-port/src/core/render.c`'s `compose_tun_high` has
+both halves of the error: it seeks kind 4 and paints the six arch records,
+and it omits the kind-3 pair entirely. Another entry for §11's list — the C
+reference was wrong, the port copied it, and no test could see it because
+both sides agreed.
+
+**The evidence, at phase 0 / dr7 / ci1.** The kind-3 pair carves an opening
+16 px high at the lane centre and 20 px half-wide at the deck: that is
+`RoadMesh.ARCH_BORE_PX` to the pixel, the same bore the geom-3 blocks already
+draw. The kind-5 records above it are top `y[51..61]`, side `y[51..81]`,
+front `y[62..81]`, and the kind-3 front below them runs `y[82..101]` down to
+the deck — one continuous masonry face from the tier's top edge to the road,
+pierced once.
+
+**Fixed on both sides.** `render.c` is corrected in place, with a comment
+citing `0x2fb0` — it is the measuring instrument and it had to be right
+before anything could be measured against it. `RoadMesh.gd`'s geometry 5 is
+now `_block(..., FULL_BLOCK_Y, code, bored = true, col)`: the geom-3 path at
+full height, which is what the substitution above says it is.
+
+**This closes #29c.** The tier's "true lower bound", which that entry says had
+not been derived, is not a bound at all — the tier front simply ends where the
+kind-3 front begins, and the sliver of vault the port left showing was vault
+it should never have drawn.
+
+### The measurements
+
+Both states measured against the CORRECTED reference, since the old one
+disagrees with the binary on exactly these cells. The metric is the fraction
+of road-ish pixels (the deck ramp, the block and arch colours) that classify
+differently, over rows 40..167. Road 2 has two tun_high cells at row 80, on
+screen only at t=640; road 19 has 31 of them at rows 15..27.
+
+| frame | port before (3 runs) | port after (2 runs) |
+|---|---|---|
+| road 2 t=100 | 15.03 / 14.98 / 15.03 % | 14.98 / 15.03 % |
+| road 2 t=240 | 18.94 / 19.04 / 20.61 % | 20.59 / 20.31 % |
+| road 2 t=420 | 15.77 / 14.21 / 16.90 % | 16.02 / 15.80 % |
+| **road 2 t=640** | **19.98 / 18.98 / 18.49 %** | **11.23 / 10.46 %** |
+| road 19 t=120 | 10.06 % | 9.52 % |
+| **road 19 t=180** | **38.97 %** | **17.70 %** |
+
+The repeated runs are there because a windowed capture does not repeat
+exactly — #29b and #39b — and the spread has to be known before a difference
+can be called one. The ticks where no tun_high is on screen move around inside
+that spread and nowhere else; the reference itself is byte-identical at
+t=100/240/420 before and after the correction, which is the check that says
+so.
+
+### 12.2 — two more functions read, both clean
+
+- **`fn_5064`, the road-select highlight.** A 48x9 box at `0xf3e`, i.e.
+  x=62 y=12, stepped by `(sel % 3) * 9` rows and `((sel / 3) % 5) * 39` rows,
+  plus 160 px of x for `sel >= 15`. `Menu.gd`'s `GO_BASE (62,12)`,
+  `GO_ROAD_PITCH 9`, `GO_WORLD_PITCH 39`, `GO_COLUMN 160` and its 48x9
+  highlight are the same numbers, and `(rd % 15) / 3` equals `(sel / 3) % 5`
+  over 0..29. Recorded because a 0-pixel agreement with the C reference was
+  what made this suspicious, and it is now agreement with the binary.
+- **`fn_1f2c`, the per-road init.** Ship placed at x `0x8000`, y `0x2800`;
+  gravity acceleration is `-(gravity * 0x1680 / 0x190)`, i.e. `-(g * 14.4)`
+  truncated. Checked against `grav_accel_per_tick` in all 30 exported roads:
+  30 of 30 agree (road 2: gravity 8, -115).
+
+### A lead that is now exhausted
+
+§11's best lead was art exported under `data/gfx/` that nothing referenced —
+it is what found 11.3, the intro's missing 23 seconds. Re-run today, every one
+of the 46 PNGs is referenced, the six `*_dim` plates through `gfx.json`'s
+`dim` field rather than by name. That lead is spent; the composer's own
+dispatch table is the one that replaced it.
+
+### A dead end worth writing down: the letterbox cannot be painted
+
+On a 16:9 screen `aspect=keep` pillarboxes the 4:3 picture and the bars are
+black. Filling them with a frame looks like a ten-line `CanvasLayer` and is
+not possible at all from inside the tree. Two measurements, at 1440x810:
+
+- A layer at `layer = -100` drawing into the bar coordinates runs, and its
+  arithmetic is right — inverting `get_final_transform()` puts the window
+  corners at canvas `(-80,-15)` and `(400,255)`, exactly the 80- and
+  15-pixel bars — and **nothing appears**.
+- `RenderingServer.set_default_clear_color()` does not reach them either.
+
+With `keep`, Godot attaches the root viewport to the letterboxed sub-rect;
+the surround is not part of any viewport and no draw call can reach it. The
+only way to paint there is `aspect=expand` plus rendering the game into a
+fixed 320x240 `SubViewport` — which moves what `Main._capture_*` grabs, since
+those read `get_viewport().get_texture()`. That is the parity capture path,
+and this document's own rule is not to change it without measuring. So the
+bars stay black, and this is here so the next person does not spend the hour
+again.
+
+### 12.3 — #29b / #39b: the capture was of a tick nobody asked for
+
+Both entries describe the same thing from different ends: a screenshot named
+`t0640` was not necessarily of tick 640. `GameLoop._process` runs a catch-up
+loop, and a frame that owes several ticks simulates all of them; `Main`'s
+capture then ran afterwards and photographed tick N+k. Nothing recorded k, so
+the same build measured 18.5% and 20.0% of road 2's road pixels on
+consecutive runs, and the road-16 explosion came out one animation frame
+stale.
+
+**Fixed at the cause.** `GameLoop.halt_ticks` stops the catch-up loop on a
+tick that is going to be photographed. The debt is deferred, not dropped, so
+the run does not slow down — the next frame catches it up. `Main` fills it
+from `--shot-ticks`, and only when `--shots` is set, so ordinary play is
+untouched.
+
+`LaunchOptions.shot_alpha` (`--shot-alpha`) then pins WHERE inside the tick
+the shot is taken, since presentation interpolates between ticks. It defaults
+to **0.0** — the state exactly on the tick, which is what the reference draws
+a frame *for*.
+
+Measured on road 2 t=640, against the corrected reference:
+
+| | runs | spread |
+|---|---|---|
+| before | 18.49 / 18.98 / 19.98 % | 1.49 pts |
+| after, alpha 0.0 | 9.61 / 10.51 / 11.23 % | 1.62 pts |
+| after, alpha 1.0 | 11.23 / 11.66 % | — |
+
+The simulated state at capture is now identical run to run — four consecutive
+runs report the same tick, z, x, y and presented row to the last digit, where
+before they did not. **The remaining spread is not the simulation.** Diffing
+two captures of the identical pinned state shows 776 differing pixels and
+every one of them is a single-pixel silhouette edge: block corners, the near
+edge of the deck. That is GPU rasterisation rounding on a 3D scene being
+compared against a 2D span filler, and the metric counts each such pixel, so
+~2 points of it is the floor of what this measurement can resolve. Recorded
+so the next person does not read a 2-point move as a result.
+
+The old note in `Main._capture_pending` — that the reference corresponds to a
+moment part-way through this engine's tick, so the un-rewound capture is
+closer — was drawn from the behaviour it was describing: the capture was PAST
+the tick, not part-way into it. With k pinned to 0 the fractional argument no
+longer applies, and alpha 0.0 measures at least as well as anything else.
+
+### 12.4 — the other four composers, all clean
+
+With `fn_2d03`'s dispatch table in hand the remaining handlers were read
+against `skyroads-port/src/core/render.c` line by line:
+
+| nibble | EXE | reference | verdict |
+|---|---|---|---|
+| 0 | `0x2e50` | `compose_floor` | matches |
+| 1 | `0x303d` | `compose_tunnel` | matches — mouth wall `0x43`, six arch records, two rims at the mouth only |
+| 2 | `0x2e9f` | `compose_lowblock` | matches |
+| 3 | `0x2ee1` | `compose_tun_low` | matches — and it is the shape 12.1 says a tun_high is, at half height |
+| 4 | `0x2f3c` | `compose_highblock` | matches |
+| 5 | `0x2fb0` | `compose_tun_high` | **WRONG — see 12.1** |
+| 6..15 | `0x3aad` | — | a bare `ret`: those nibbles draw nothing |
+
+So the damage was bounded to the one handler. Two labelling slips are left
+alone because they change no behaviour: `compose_lowblock`'s "top faces"
+comment is on the record that draws the FRONT, and `compose_highblock`'s
+"upper front"/"upper side" are the other way round — the kind-5 group is top,
+side, front in that order, which the decoded records show directly
+(`k61 y[51..61]`, `k63 y[51..81]`, `k62 y[62..81]`).
+
+The port's `geom` 2 and 3 are `_block(..., HALF_BLOCK_Y, code, geom == 3, col)`
+— unbored and bored half blocks — which is exactly the pair the EXE draws, and
+12.1 makes geom 5 the same pair's full-height bored member.
+
+One difference is deliberate and applies to every handler: the original gates
+each face on its neighbour's shape (`nearer < 2`, `inner < 4`, ...) because it
+paints spans with no depth buffer. The port draws the faces unconditionally
+and lets 3D occlusion hide them. That is not a defect, but it is not
+identical either — a tun_high standing behind a HALF block is a case where
+the original draws no front at all and the port draws one, and no road has
+been checked for that adjacency.
+
+### The audit tooling
+
+`scratchpad/audit/sdis.py` (code) and `dat.py` (data segment) are throwaway
+but the recipe is not: code image at `hdrpar * 16`, data at paragraph
+`0x66E`, `CS_MODE_16`, and `tools/dump_bands.c kindlines <slot>` for the
+records a handler consumes. That pair is what turns "the C reference says so"
+into a measurement.
+
+### 12.5 — a capture run must not be steerable
+
+The gate reported `render_backdrop.gd` failing on road 5 at ticks 61 and 121,
+571 pixels wrong in rows 0..31 — the band that suite exists to protect,
+because tall roadside blocks used to project up into the sky there. The
+reference was checked first and holds the invariant exactly: rows 0..31 of
+road 5 differ from `world1_0.png` by **0 pixels** at ticks 60, 61, 62, 120,
+121 and 122.
+
+The 571 pixels were not geometry. They were text —
+`recorded 15 ticks / road05_2026-08-31T10-49-54.bin`, the recording toast,
+drawn over the sky. That file is on disk, 45 bytes, 15 ticks of `01 02 00`,
+which is the held-accelerate route; and the run went on to tick 121, so it
+was not the death-path dump. The remaining trigger is the `R`/`F2` developer
+key, and the gate had a focused windowed Godot at that second.
+
+So the measurement was steered by a keystroke that had nothing to do with the
+game. **`Main._unhandled_input` now ignores every developer key during a
+`--shots` run** — `P` stalls the loop, `L` and `C` paint overlays, `F2`/`R`
+dumps and toasts. ESC still works, so a run can still be abandoned. Nothing
+changes for ordinary play.
+
+Worth keeping in mind beyond this one suite: a windowed capture takes focus,
+so anything typed while the gate runs goes into the game.
