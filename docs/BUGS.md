@@ -1064,6 +1064,12 @@ screen only at t=640; road 19 has 31 of them at rows 15..27.
 | road 19 t=120 | 10.06 % | 9.52 % |
 | **road 19 t=180** | **38.97 %** | **17.70 %** |
 
+**These figures were taken in palette-index space, which §12.8 later showed
+overstates the gap.** Re-measured by RGB > 16, the same frames read: road 2
+t=640 **18.9% -> 9.5%**, road 19 t=180 **34.2% -> 17.6%**. The conclusion is
+unchanged and the improvement is if anything cleaner; only the absolute
+"before" numbers were inflated. Quote the RGB figures.
+
 The repeated runs are there because a windowed capture does not repeat
 exactly — #29b and #39b — and the spread has to be known before a difference
 can be called one. The ticks where no tun_high is on screen move around inside
