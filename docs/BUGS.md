@@ -1532,3 +1532,37 @@ caught this going wrong.
 Note the same code implies the original writes the ship at NEGATIVE y on a big
 enough jump — road 11's route reaches `top = -65`. In the C port that is a
 buffer underrun; what the 1993 binary does there has not been looked at.
+
+### 12.12 — outer-column blocks are drawn too large, and too low
+
+Reported from play on road 1 ("asteroid belt"), whose only obstacles are full
+blocks in columns 0 and 6 — the outermost lanes — at rows 3, 8, 15 and 19.
+Measured against the corrected reference with the tick pinned:
+
+| tick | reference | port | delta |
+|---|---|---|---|
+| 120 | x[180..227] y[32..103], 185 px | 213 px | **+15%** |
+| 160 | x[190..293] y[32..106], 848 px | y[32..114], 953 px | **+12%**, base 8 rows low |
+| 200 | x[180..304] y[32..77], 549 px | y[32..74], 597 px | **+9%** |
+
+The horizontal extents agree almost exactly and both tops clip at row 32
+identically — so the §12.11 shader clip matches the original's band, and the
+x cone is doing its job. **The whole error is at the bottom edge**: the port
+puts the block's base up to 8 screen rows lower, which reads as the block
+being nearer than it is.
+
+This is #28's camera. The port projects with a vertical pinhole at B=2.550 and
+a SEPARATE horizontal cone through y=32 (`SkyRoadsCamera.dos_x_scale`), which
+is why x matches and y does not: there is no equivalent correction on the
+vertical axis for a column away from the centre. The original has no camera at
+all — every span is baked per direction-row and per column, so its outer
+columns carry whatever vertical foreshortening the artist's tables encode, and
+a centre-fitted pinhole cannot reproduce it.
+
+Not attempted here. `docs/BUGS.md` records three parity "improvements" that
+measured worse, all of them camera-adjacent, and this one wants the vertical
+term derived from the span tables the way `dos_x_scale` was derived for the
+horizontal — `tools/dump_bands.c lines` prints the per-row, per-column floor
+extents that would drive it. It is the largest single visible discrepancy left
+in the renderer, and the most likely to reward being done properly rather than
+fitted.
