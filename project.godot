@@ -6,6 +6,13 @@ config_version=5
 config/name="SkyRoads"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 run/main_scene="res://scenes/Main.tscn"
+config/icon="res://data/branding/icon_512.png"
+; The icons are built from the game's own art by tools/make_icons.py.
+; A DOS port that opens on the Godot splash is a DOS port with a seam in it,
+; so the boot screen is simply black — the same black the original's mode-13h
+; framebuffer starts on.
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0, 0, 0, 1)
 
 [display]
 ; The original is 320x200 in mode 13h, displayed at 4:3 — its pixels are 1.2x
@@ -13,9 +20,35 @@ run/main_scene="res://scenes/Main.tscn"
 window/size/viewport_width=320
 window/size/viewport_height=240
 window/stretch/mode="canvas_items"
+; "keep" letterboxes on a phone's wide screen rather than showing more world
+; than DOS did. That is the point: every parity measurement in docs/BUGS.md
+; assumes the 320x200 field of view, and "expand" would quietly invalidate
+; them on exactly the platform nobody is measuring.
 window/stretch/aspect="keep"
+; 4 = sensor_landscape: landscape either way up, so the phone can be turned
+; round without the picture flipping away from the player's thumbs.
+window/handheld/orientation=4
+
+[input_devices]
+; Deliberately OFF. The port has a real mouse control device (the original's
+; `control` word 2) reading absolute pointer position, and a global
+; mouse-to-touch emulation would feed the touch layer and that device at the
+; same time. `--touch` turns on a local mouse fallback inside TouchControls
+; instead, which is scoped to the one place that wants it.
+pointing/emulate_touch_from_mouse=false
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
+; Android and iOS must take the SAME renderer the parity work was measured on;
+; without this override Godot puts mobile on the "mobile" method and the road
+; is drawn by a different pipeline than every screenshot in docs/parity.
+renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
-
+; Required by the Android exporter. It only makes ETC2/ASTC *available*: every
+; texture in data/ is imported lossless (compress/mode=0) and every one of
+; them now has detect_3d/compress_to=0, so nothing is silently re-encoded when
+; a sprite turns out to be used in 3D. That auto-detection is a live hazard
+; here — the ship and the road ARE 3D, and a VRAM-compressed ship sprite would
+; break every pixel-parity measurement in docs/BUGS.md without touching a
+; single line of code.
+textures/vram_compression/import_etc2_astc=true

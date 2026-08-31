@@ -18,7 +18,11 @@
 class_name PlayerInput
 extends RefCounted
 
-enum Device { KEYBOARD = 0, JOYSTICK = 1, MOUSE = 2 }
+## 0-2 are the original's own `control` word and are the only values that are
+## ever written to skyroads.cfg. TOUCH is this port's addition for phones: it
+## is chosen by the platform, never by the settings screen, and never stored —
+## a 3 in the cfg file would not be a SkyRoads save any more.
+enum Device { KEYBOARD = 0, JOYSTICK = 1, MOUSE = 2, TOUCH = 3 }
 
 ## Past this far from centre an analogue device counts as pushed. Generous,
 ## because the result is a digital -1/0/+1 and the simulation samples it at
@@ -63,7 +67,15 @@ static func from_axes(x: float, y: float, jump: bool,
 ## plugged in — the original would simply leave the player unable to steer,
 ## which is not a useful thing to reproduce, so an absent joystick falls back
 ## to the keyboard.
-static func effective_device(control: int, joypads: int) -> int:
+##
+## `touch` wins over everything. On a phone there is no keyboard to fall back
+## to and no mouse to find, so whatever the cfg file inherited from a desktop
+## save is irrelevant; this is also why the settings screen hides the control
+## row there (Menu.touch_ui) rather than offering three dead choices.
+static func effective_device(control: int, joypads: int,
+		touch := false) -> int:
+	if touch:
+		return Device.TOUCH
 	if control == Device.JOYSTICK and joypads <= 0:
 		return Device.KEYBOARD
 	if control < Device.KEYBOARD or control > Device.MOUSE:

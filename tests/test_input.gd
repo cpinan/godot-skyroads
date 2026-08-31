@@ -130,3 +130,35 @@ func _devices() -> void:
 		== PlayerInput.Device.MOUSE, "the mouse needs nothing plugged in")
 	check(PlayerInput.effective_device(99, 0) == PlayerInput.Device.KEYBOARD,
 		"a corrupt control word still leaves the game playable")
+
+	# touch. There is no keyboard behind a phone to fall back to, so the
+	# platform's answer has to beat whatever the cfg file inherited from a
+	# desktop save — including a joystick setting with no joystick attached,
+	# which would otherwise take the fallback path and leave the on-screen
+	# stick unread.
+	for control in [PlayerInput.Device.KEYBOARD, PlayerInput.Device.JOYSTICK,
+			PlayerInput.Device.MOUSE, 99]:
+		check(PlayerInput.effective_device(control, 0, true)
+			== PlayerInput.Device.TOUCH,
+			"touch overrides control word %d" % control)
+	check(PlayerInput.effective_device(PlayerInput.Device.MOUSE, 1, false)
+		== PlayerInput.Device.MOUSE,
+		"without touch the cfg still decides — the override is not sticky")
+	# The touch device must never reach skyroads.cfg: the file is the DOS
+	# save format and a 3 in the control word is not a SkyRoads save.
+	check(PlayerInput.Device.TOUCH > PlayerInput.Device.MOUSE,
+		"TOUCH sits outside the original's 0..2 control word")
+
+	# the on-screen stick's geometry, in the units TouchControls hands over:
+	# an offset divided by STICK_RANGE. A thumb resting dead centre must
+	# produce nothing at all, or the ship drifts while nobody is touching it.
+	check(PlayerInput.from_axes(0.0, 0.0, false) == [0, 0, 0],
+		"a stick at rest steers nowhere and does not accelerate")
+	var edge := PlayerInput.DEADZONE + 0.01
+	check(PlayerInput.from_axes(edge, 0.0, false)[0] == 1,
+		"just past the deadzone the stick steers")
+	check(PlayerInput.from_axes(PlayerInput.DEADZONE - 0.01, 0.0, false)[0]
+		== 0, "just inside the deadzone it does not")
+	# a full-deflection drag is clamped by the caller, never by from_axes
+	check(PlayerInput.from_axes(3.0, -3.0, true) == [1, 1, 1],
+		"an over-long drag is still just steer right + throttle + jump")
