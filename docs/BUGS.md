@@ -1486,3 +1486,49 @@ identical sequence. This one only shows in play.
 
 Thirteenth defect found by reading the binary, and the first outside the
 renderer and the shell.
+
+### 12.11 — the ship was sheared off on a high jump
+
+Found by playing, which is the only way it could have been found: every parity
+suite compares frames with the ship near the deck.
+
+The world is composed into rows 32..137 of the DOS framebuffer and never above
+— `render.c` writes into `fb->px + 32*320` and the span records are baked to
+stay inside that. A 3D camera has no such bound, so a tall block close to the
+ship projects up into the sky (that was #30-era work). The port clipped it by
+painting the backdrop's own top rows back over the 3D from a `CanvasLayer`.
+
+**A `CanvasLayer` draws over everything, including the ship** — and the
+original draws the ship UNCLIPPED. `draw_ship` bounds x and the cowl mask and
+never y:
+
+```c
+int x = left + j, y = top + i;
+if (x < 0 || x >= 320 || cowl_hidden(x, y))
+    continue;
+fb->px[y * 320 + x] = px;          /* no y bound at all */
+```
+
+`top = 0x9d - p->y / 0x80`, so the ship rests at row 77 and a jump walks it up
+the screen and legitimately into the sky band. Measured on road 17 at t=150,
+where the sprite straddles the boundary:
+
+| | ship pixels | topmost row |
+|---|---|---|
+| reference | 290 | 31 |
+| port, before | 145 | 35 |
+| port, after | 149 | 32 |
+
+The top of the ship — its navy canopy and the white dot — was simply gone.
+
+**Fixed by clipping the geometry instead of covering it.**
+`SkyRoadsCamera.make_dos_material` now discards fragments above the viewport
+top in screen space, which is what the original's baked span records amount
+to, and the `AboveViewport` cover is deleted. The backdrop already fills those
+rows, so nothing else was needed. `render_backdrop.gd` still measures 0
+differing pixels on all four of its frames, which is the check that would have
+caught this going wrong.
+
+Note the same code implies the original writes the ship at NEGATIVE y on a big
+enough jump — road 11's route reaches `top = -65`. In the C port that is a
+buffer underrun; what the 1993 binary does there has not been looked at.

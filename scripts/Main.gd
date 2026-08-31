@@ -336,29 +336,16 @@ func _begin(index: int) -> void:
 	below.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.add_child(below)
 
-	# ...and the same again above it. The DOS composer writes into
-	# `fb->px + 32*320` and its band records are baked to stay inside the
-	# viewport, so rows 0..31 are the world picture and NOTHING else, at every
-	# tick, on every road (checked against the C engine: zero differing
-	# pixels). Here the camera's frustum covers the whole window, so a tall
-	# block close to the ship projected up into the sky — road 5's teal
-	# platforms showed above the horizon where the original has only stars.
-	# Redrawing the picture's own top rows over the 3D restores the bound.
-	var sky := TextureRect.new()
-	sky.name = "AboveViewport"
-	var atlas := AtlasTexture.new()
-	atlas.atlas = Backdrop.flattened(
-		load("res://data/gfx/world%d_0.png" % _road.world))
-	atlas.region = Rect2(0, 0, SkyRoads.SCREEN_W, SkyRoads.VIEW_TOP)
-	sky.texture = atlas
-	sky.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	sky.stretch_mode = TextureRect.STRETCH_SCALE
-	sky.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sky.position = Vector2.ZERO
-	sky.size = Vector2(SkyRoads.SCREEN_W,
-		SkyRoads.VIEW_TOP * SkyRoads.PIXEL_ASPECT)
-	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hud.add_child(sky)
+	# Nothing is drawn over the top 32 rows any more. The world used to be
+	# clipped there by painting the backdrop's own rows back over the 3D — but
+	# that painted over the SHIP too, and the original draws the ship
+	# unclipped: draw_ship bounds x and the cowl mask, never y, so a high jump
+	# legitimately puts it in the sky band. Measured on road 17 t=150, the
+	# reference draws 290 ship pixels from row 31 down where the port drew 145
+	# from row 35 — the top of the ship simply sheared off.
+	# The geometry is clipped in its own shader instead
+	# (SkyRoadsCamera.make_dos_material), which is what the original's baked
+	# span records amount to, and the backdrop already fills those rows.
 
 	var dash := TextureRect.new()
 	dash.texture = load("res://data/gfx/dashbrd_0.png")

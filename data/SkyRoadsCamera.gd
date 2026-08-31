@@ -132,11 +132,24 @@ static func make_dos_material(transparent := false, depth_always := false,
 	elif depth_always:
 		modes += ", depth_draw_always"
 	# the halves must partition, not overlap: one side takes the boundary
-	var clip_src := ""
+	# The world is composed into rows 32..137 of the DOS framebuffer and never
+	# above: render.c writes into `fb->px + 32*320` and the span records are
+	# baked to stay inside that. A 3D camera has no such bound, so a tall block
+	# close to the ship projects up into the sky. This clips it in screen space
+	# instead — which is what the original's baked bands amount to.
+	#
+	# It used to be done by painting the backdrop's own top rows back over the
+	# 3D from a CanvasLayer. That also painted over the SHIP, which the
+	# original draws unclipped (draw_ship bounds x and the cowl, never y), so a
+	# high jump had its top sheared off: measured on road 17 t=150, the
+	# reference draws 290 ship pixels from row 31 down and the port drew 145
+	# from row 35.
+	var clip_src := "\tif (SCREEN_UV.y < %f) discard;" % (
+		float(SkyRoads.VIEW_TOP) * SkyRoads.PIXEL_ASPECT / SkyRoads.SQUARE_H)
 	if clip == CLIP_FAR:
-		clip_src = "\tif (v_depth < %f) discard;" % SHIP_SPLIT_DEPTH
+		clip_src += "\n\tif (v_depth < %f) discard;" % SHIP_SPLIT_DEPTH
 	elif clip == CLIP_NEAR:
-		clip_src = "\tif (v_depth >= %f) discard;" % SHIP_SPLIT_DEPTH
+		clip_src += "\n\tif (v_depth >= %f) discard;" % SHIP_SPLIT_DEPTH
 	var code := "shader_type spatial;\nrender_mode " + modes + ";\n" + """
 varying float v_depth;
 void vertex() {
