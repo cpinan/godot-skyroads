@@ -1,0 +1,88 @@
+{
+ "note": "Palette pairs for the intro, decoded from INTRO.LZS. \"dim\" is the first CMAP of each pair, the bright render is the existing intro_<n>.png. See tools/export_intro_palettes.py.",
+ "timing": {
+  "voice_tick": 24,
+  "anim_start_tick": 61,
+  "anim_ticks_per_frame": 2,
+  "anim_hold": 72,
+  "wipe_ticks": 18,
+  "wipe_columns": 319,
+  "flash_in": 5,
+  "flash_hold": 9,
+  "flash_out": 70,
+  "plate_in": 50,
+  "plate_hold": 50,
+  "plate_out": 50,
+  "title_fade": 36
+ },
+ "logo": 1,
+ "plates": [
+  4,
+  5,
+  6,
+  7,
+  8
+ ],
+ "picts": [
+  {
+   "index": 1,
+   "file": "intro_1.png",
+   "dim": "intro_1_dim.png",
+   "screen_x": 0,
+   "screen_y": 32,
+   "w": 320,
+   "h": 54,
+   "bright_matches_export": true
+  },
+  {
+   "index": 4,
+   "file": "intro_4.png",
+   "dim": "intro_4_dim.png",
+   "screen_x": 47,
+   "screen_y": 99,
+   "w": 230,
+   "h": 82,
+   "bright_matches_export": true
+  },
+  {
+   "index": 5,
+   "file": "intro_5.png",
+   "dim": "intro_5_dim.png",
+   "screen_x": 116,
+   "screen_y": 125,
+   "w": 88,
+   "h": 55,
+   "bright_matches_export": true
+  },
+  {
+   "index": 6,
+   "file": "intro_6.png",
+   "dim": "intro_6_dim.png",
+   "screen_x": 110,
+   "screen_y": 125,
+   "w": 100,
+   "h": 30,
+   "bright_matches_export": true
+  },
+  {
+   "index": 7,
+   "file": "intro_7.png",
+   "dim": "intro_7_dim.png",
+   "screen_x": 120,
+   "screen_y": 125,
+   "w": 80,
+   "h": 41,
+   "bright_matches_export": true
+  },
+  {
+   "index": 8,
+   "file": "intro_8.png",
+   "dim": "intro_8_dim.png",
+   "screen_x": 118,
+   "screen_y": 124,
+   "w": 86,
+   "h": 42,
+   "bright_matches_export": true
+  }
+ ]
+}

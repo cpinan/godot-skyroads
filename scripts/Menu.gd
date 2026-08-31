@@ -19,7 +19,6 @@ class_name Menu
 extends CanvasLayer
 
 signal start_road(index: int)
-signal start_demo
 signal quit_game
 
 ## Kept as an alias so callers (Main, the capture paths, the tests) keep
@@ -44,6 +43,14 @@ const TICK_MAX := 7
 var model := MenuModel.new()
 var cfg: Config
 
+## Set by Main on a phone. Two effects, both here rather than in the model:
+## taps navigate (there is no keyboard to press Enter on), and the settings
+## screen's three control-device items are dimmed, because the device is the
+## touchscreen and nothing on that row can change it.
+var touch_ui: bool:
+	get: return model.touch_ui
+	set(v): model.touch_ui = v
+
 var screen: int:
 	get: return model.screen
 	set(v): model.screen = v
@@ -66,21 +73,27 @@ var help_page: int:
 var fader: Callable
 
 var _tex_cache := {}
-## fractional ticks carried between frames, so the attract countdown does not
-## drift with the frame rate
-var _idle := 0.0
 var _sprites: Array[TextureRect] = []
 var _bg: TextureRect
 var _overlay: Control
 
 
 ## SETMENU ships ten overlays sharing one 3-colour CMAP: picts 1-5 outline
-## each item in white, 6-10 in orange. game.c:257-260 blits the base pict
-## plus EXACTLY ONE of them, picts[1 + sel] — so the white outline is the
-## cursor and the orange set is never used. Items 0-2 are the control device,
-## 3-4 the sound setting; the screen shows no current-state feedback at all,
-## which is the original's own behaviour, not an omission here.
+## each item in white, 6-10 in orange. Items 0-2 are the control device, 3-4
+## the sound setting.
+##
+## What is drawn here is the white cursor alone, picts[1 + sel], because that
+## is what the C reference does (game.c:257-260) — and it is INCOMPLETE. The
+## retail EXE's fn_4ae2 also paints the ORANGE overlay over the item that is
+## currently active (control device, sound state) and erases it from the
+## others, so the original's screen tells the player what is selected. The
+## port does not; that is BUGS §11. Do not "confirm" this against the
+## goldens — they came from the same C reference and are missing the same
+## thing.
 const SET_CURSOR_FIRST := 1
+## picts 6..10 — the orange set, one per item, drawn for the setting that is
+## currently in force rather than for the cursor.
+const SET_STATE_FIRST := 6
 
 var _gfx: Dictionary = {}
 
@@ -122,6 +135,10 @@ func _ready() -> void:
 	_bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_bg.position = Vector2.ZERO
 	_bg.size = canvas
+	# Nothing in a menu is a widget: every screen is a picture and the
+	# navigation is the shell's. Letting a TextureRect claim pointer events
+	# would make taps land on the art instead of reaching handle_input.
+	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_bg)
 	_overlay = Control.new()
 	_overlay.position = Vector2.ZERO
@@ -129,11 +146,15 @@ func _ready() -> void:
 	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
-	# how many help screens there are is data, not a constant: the C engine
-	# pages until it runs out of HELPMENU picts (game.c:268)
+	# How many help screens there are is NOT the pict count. The C engine
+	# pages until HELPMENU.LZS runs out (game.c:268) and the file holds three
+	# full screens, but the retail binary shows two: fn_4e12 @0x4e21 calls
+	# fn_4dac once and then a second time only if the key was not ESC, and
+	# then returns. helpmenu_2 is art the 1993 game never displays, like
+	# INTRO.LZS's "Highscore" plate. Take the smaller of the two.
 	var pages: int = (_gfx.get("helpmenu", []) as Array).size()
 	if pages > 0:
-		model.help_pages = pages
+		model.help_pages = mini(pages, MenuModel.HELP_PAGES)
 	_load_gomenu_index()
 	_show()
 
@@ -199,6 +220,7 @@ func _place(file: String, name: String) -> void:
 	tr.position = _to_canvas(_gfx_pos(file, name))
 	tr.size = Vector2(tex.get_width(),
 		tex.get_height() * SkyRoads.PIXEL_ASPECT)
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(tr)
 	_sprites.append(tr)
 
@@ -233,10 +255,28 @@ func _show() -> void:
 	if screen == Screen.GO:
 		_tex("gomenu_1")             # the tick pip, drawn from _draw_overlay
 	if screen == Screen.SETTINGS:
-		# exactly one overlay, the outline round the selected item
+		# The ORANGE overlays first: fn_4ae2 @0x4ae2 walks all five items and
+		# calls fn_4aaf(i + 5, mode) with mode 1 where `i` is the cfg's
+		# control device or its sound flag + 3, and 0xff everywhere else.
+		# fn_41e5's threshold blit (@0x41cb: below the transparency byte the
+		# pixel is skipped, below the threshold it is erased back to the base
+		# picture, at or above it it is drawn) makes mode 1 DRAW and mode 0xff
+		# ERASE. Objects 5..9 are picts 6..10, the orange set. So the original
+		# marks the settings currently in force and this used to show nothing.
+		for i in MenuModel.SETTINGS_ITEMS:
+			if _state_marked(i):
+				_place("setmenu", "setmenu_%d" % (SET_STATE_FIRST + i))
+		# then the white outline, the moving cursor, over the top
 		# (game.c:259-260)
 		_place("setmenu", "setmenu_%d" % (SET_CURSOR_FIRST + set_sel))
 	elif screen == Screen.MAIN:
+		# The SkyRoads logo. fn_4e36 @0x4f06 blits INTRO.LZS pict 1 (320x54 at
+		# y=32) over the title picture before it ever draws an item box, with
+		# fn_4162's transparency byte 0 and threshold 1 — a plain
+		# index-0-transparent blit, so the whole logo lands. The port drew the
+		# title and the boxes and nothing between them, which left the menu
+		# with no game name on it at all.
+		_place("intro", "intro_1")
 		_place("mainmenu", "mainmenu_%d" % main_sel)
 	_overlay.queue_redraw()
 
@@ -278,7 +318,12 @@ func _draw_overlay() -> void:
 					Vector2(50, 11 * SkyRoads.PIXEL_ASPECT)),
 					Color(1, 1, 1, 0.35), false, 1.0)
 		Screen.SETTINGS:
-			pass                          # the cursor is the overlay pict
+			# the cursor is the overlay pict; on a phone the three items the
+			# cursor can no longer reach are dimmed so the screen says why
+			if touch_ui:
+				for i in MenuModel.SETTINGS_SOUND_FIRST:
+					_overlay.draw_rect(_item_rect(i), Color(0, 0, 0, 0.72),
+						true)
 		Screen.HELP:
 			pass
 
@@ -290,14 +335,107 @@ func _gfx_pos(file: String, name: String) -> Vector2:
 	return Vector2.ZERO
 
 
+## An overlay pict's rectangle in canvas space. The picts are the original's
+## own outlines around each item, so their offsets and sizes ARE the item
+## layout — no screen coordinates need inventing for touch or for dimming.
+func _gfx_rect(file: String, name: String) -> Rect2:
+	for e in _gfx.get(file, []):
+		if e["file"] == name + ".png":
+			return Rect2(_to_canvas(Vector2(e["screen_x"], e["screen_y"])),
+				Vector2(float(e["w"]), float(e["h"]) * SkyRoads.PIXEL_ASPECT))
+	return Rect2()
+
+
+## Is settings item `i` the setting currently in force? fn_4ae2's test,
+## verbatim: the control device for items 0-2, the sound flag for 3-4. On a
+## phone the control row is dimmed and the device is the touchscreen, so
+## marking one of those three would point at something that is not true.
+func _state_marked(i: int) -> bool:
+	if cfg == null:
+		return false
+	if i < MenuModel.SETTINGS_SOUND_FIRST:
+		return not touch_ui and i == cfg.control
+	return i == MenuModel.SETTINGS_SOUND_FIRST + cfg.sound_off
+
+
+## Settings item `i` (0-2 control device, 3-4 sound), from setmenu pict 1+i.
+func _item_rect(i: int) -> Rect2:
+	return _gfx_rect("setmenu", "setmenu_%d" % (SET_CURSOR_FIRST + i))
+
+
+## Main-menu item `i`. The three mainmenu picts share one 68x57 box — they
+## highlight a row inside it rather than moving — so the rows are that box
+## split three ways.
+func _main_item_rect(i: int) -> Rect2:
+	var box := _gfx_rect("mainmenu", "mainmenu_0")
+	var h := box.size.y / float(MenuModel.MAIN_ITEMS)
+	return Rect2(box.position + Vector2(0, h * i), Vector2(box.size.x, h))
+
+
+## Which shell key a tap at `p` (canvas space) means, plus any selection it
+## implies. Returns [] for a tap that means nothing on this screen.
+##
+## Selecting and confirming are one gesture everywhere except the road list,
+## where a tap only moves the cursor and a second tap on the SAME road
+## starts it: thirty small cells and an instant launch is a bad combination
+## on a phone.
+func _keys_for_tap(p: Vector2) -> Array:
+	match screen:
+		Screen.MAIN:
+			for i in MenuModel.MAIN_ITEMS:
+				if _main_item_rect(i).has_point(p):
+					model.main_sel = i
+					return [MenuModel.Key.ENTER]
+			return []
+		Screen.GO:
+			for rd in MenuModel.ROAD_COUNT:
+				var c := road_cell(rd)
+				var r := Rect2(_to_canvas(Vector2(c.x, c.y)),
+					Vector2(48, 9 * SkyRoads.PIXEL_ASPECT))
+				if r.has_point(p):
+					if rd == go_sel:
+						return [MenuModel.Key.ENTER]
+					model.go_sel = rd
+					_show()
+					return []
+			return [MenuModel.Key.ESCAPE]
+		Screen.SETTINGS:
+			for i in MenuModel.SETTINGS_ITEMS:
+				if not _item_rect(i).has_point(p):
+					continue
+				if i < model.settings_first_item():
+					return []         # a dimmed item is inert, not a way out
+				model.set_sel = i
+				return [MenuModel.Key.ENTER]
+			return [MenuModel.Key.ESCAPE]
+		Screen.HELP:
+			return [MenuModel.Key.ENTER]
+	return []
+
+
 func handle_input(ev: InputEvent) -> void:
-	if not (ev is InputEventKey and ev.pressed and not ev.echo):
-		return
-	var key := MenuModel.key_from_event((ev as InputEventKey).keycode)
-	if key < 0:
-		return                       # a key the shell does not use
+	if ev is InputEventKey and ev.pressed and not ev.echo:
+		var key := MenuModel.key_from_event((ev as InputEventKey).keycode)
+		if key < 0:
+			return                   # a key the shell does not use
+		_apply([key])
+	elif touch_ui and ev is InputEventScreenTouch \
+			and (ev as InputEventScreenTouch).pressed:
+		var p: Vector2 = _overlay.get_global_transform().affine_inverse() \
+			* (ev as InputEventScreenTouch).position
+		var keys := _keys_for_tap(p)
+		if not keys.is_empty():
+			_apply(keys)
+
+
+## One shell tick with `keys` pressed, plus everything the view owes the
+## model afterwards: persisting settings, acting on an exit, and fading a
+## screen change. Shared by the keyboard and the touch paths so a tap and a
+## keypress can never diverge.
+func _apply(keys: Array) -> void:
 	var was := model.screen
-	model.step([key])
+	var was_page := model.help_page
+	model.step(keys)
 	if model.settings_dirty:
 		# the model never touches the filesystem; persisting is the view's job
 		cfg.control = model.control
@@ -314,17 +452,32 @@ func handle_input(ev: InputEvent) -> void:
 			model.clear_exit()
 			start_road.emit(road)
 			return
-		MenuModel.Exit.DEMO:
-			model.clear_exit()
-			start_demo.emit()
-			return
 	if model.screen != was:
 		# a screen change is the one transition the original fades through
 		var target := model.screen
 		model.screen = was
 		_change_screen(target)
 		return
+	if model.screen == Screen.HELP and model.help_page != was_page:
+		# Each help page is its own fn_4dac call: fade in over 36 ticks
+		# (@0x4dd8), wait for a key, fade out over 36 (@0x4ded). So turning a
+		# page fades exactly as entering the screen does — the port used to
+		# flip help pages instantly.
+		var page := model.help_page
+		model.help_page = was_page
+		_change_help_page(page)
+		return
 	_show()
+
+
+func _change_help_page(page: int) -> void:
+	if fader.is_valid():
+		fader.call(func() -> void:
+			model.help_page = page
+			_show())
+	else:
+		model.help_page = page
+		_show()
 
 
 func _change_screen(s: int) -> void:
@@ -337,18 +490,7 @@ func _change_screen(s: int) -> void:
 		_show()
 
 
-## The attract demo is counted in TICKS by the original (game.c:200), so real
-## time is converted rather than compared against a float deadline — a frame
-## rate change must not move when the demo starts.
-func _process(delta: float) -> void:
-	if model.screen != Screen.MAIN or model.exit != MenuModel.Exit.NONE:
-		return
-	_idle += delta * SkyRoads.TICK_HZ
-	var due := int(_idle)
-	if due <= 0:
-		return
-	_idle -= float(due)
-	model.advance(due)
-	if model.exit == MenuModel.Exit.DEMO:
-		model.clear_exit()
-		start_demo.emit()
+# No _process. The retail menus have no clock in them at all: fn_5fad is a
+# blocking `int 21h ah=7`, so a menu cannot time out and cannot start the
+# attract demo. That is Main's job now, off the end of an unskipped intro —
+# BUGS §11.11.

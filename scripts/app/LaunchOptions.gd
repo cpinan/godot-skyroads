@@ -37,6 +37,12 @@ var route_suffix := ""        ## a named variant: --route crash -> _crash
 var want_overlay := false
 var want_labels := false
 var autodump := false
+## Reproduce the original's own defects even where the port normally works
+## around them. Implied by every capture mode; see is_parity_capture().
+var authentic := false
+## Force the on-screen touch controls on a desktop build, so the mobile HUD
+## can be driven and screenshotted without a phone.
+var force_touch := false
 
 ## Arguments that were not understood, for the caller to report.
 var unknown: Array[String] = []
@@ -99,6 +105,10 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				o.want_overlay = true
 			"--labels":
 				o.want_labels = true
+			"--authentic":
+				o.authentic = true
+			"--touch":
+				o.force_touch = true
 			"--magenta-backdrop":
 				pass                  # read directly by Backdrop
 			_:
@@ -119,3 +129,12 @@ func route_for(index: int) -> String:
 ## True when the run is automated and must not fade, wait, or play the intro.
 func is_automated() -> bool:
 	return mode != Mode.MENU
+
+
+## True when this run's frames are being compared against the C reference.
+## Every deliberate deviation from the original — there is exactly one, the
+## readable GRAV-O-METER of BUGS #41 — must be switched off here, or the
+## pixel suites measure the deviation instead of the renderer. `--authentic`
+## forces the same thing for a run a human is watching.
+func is_parity_capture() -> bool:
+	return authentic or not shot_dir.is_empty() or not menu_shot.is_empty()

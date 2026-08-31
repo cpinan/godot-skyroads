@@ -53,9 +53,22 @@ var _audio: AudioMgr
 var _intro: Intro
 var _paused := false
 var _fading := false
+## The running fade, kept only so a skippable one can be run to its end.
+var _fade_tween: Tween
+## What that fade is on its way to doing, so a skip can still do it.
+var _fade_cb := Callable()
+var _fade_skippable := false
 var _fade_rect: ColorRect
 var _menu_state := {}
 var _last_menu_screen := -1
+## The on-screen thumbstick and jump button, alive only while a road is
+## being played. Null on desktop.
+var _touch: TouchControls
+## Whether this run drives itself by finger: a phone, or `--touch` on a
+## desktop so the mobile layout can be looked at without one. Decided once,
+## at boot, because a control scheme that changes under the player is worse
+## than either scheme.
+var _touch_ui := false
 
 ## fade_to pacing (game.c:86-92): 36 ticks out, switch, 36 ticks in.
 const FADE_SECS := 1.0
@@ -83,6 +96,13 @@ func _ready() -> void:
 	_want_overlay = opt.want_overlay
 	_want_labels = opt.want_labels
 	_menu_shot = opt.menu_shot
+	# A parity capture must render the reference screen and nothing else, so
+	# the touch layer stays off there even on a phone.
+	_touch_ui = opt.force_touch \
+		or (OS.has_feature("mobile") and not opt.is_parity_capture())
+	# Godot quits on Android's back gesture unless told otherwise, which would
+	# end a run rather than back out of it. _notification handles it instead.
+	get_tree().set_quit_on_go_back(false)
 	var start_now := opt.mode == LaunchOptions.Mode.PLAY \
 		or opt.mode == LaunchOptions.Mode.REPLAY
 
@@ -113,6 +133,7 @@ func _open_menu(screen: int = -1) -> void:
 	_teardown()
 	_menu = Menu.new()
 	_menu.cfg = _cfg
+	_menu.touch_ui = _touch_ui
 	# selections survive reopening — the original keeps them in sr_game for
 	# the whole session (game.h:33-36)
 	for k in _menu_state:
@@ -128,10 +149,6 @@ func _open_menu(screen: int = -1) -> void:
 	_menu.fader = _fade_transition
 	_menu.start_road.connect(func(i: int) -> void:
 		_fade_transition(_begin.bind(i)))
-	_menu.start_demo.connect(func() -> void:
-		_fade_transition(func() -> void:
-			_replaying = true
-			_begin(0)))
 	_menu.quit_game.connect(func() -> void: get_tree().quit())
 	add_child(_menu)
 	_last_menu_screen = -1
@@ -140,15 +157,29 @@ func _open_menu(screen: int = -1) -> void:
 func _start_intro() -> void:
 	_intro = Intro.new()
 	_intro.audio = _audio
-	_intro.done.connect(func() -> void: _fade_transition(_end_intro))
+	_intro.done.connect(func(skipped: bool) -> void:
+		_fade_transition(_end_intro.bind(skipped), true))
 	add_child(_intro)
 
 
-func _end_intro() -> void:
+## What the intro leads to, and it is not always the menu.
+##
+## main @0x021e-0x022f: `fn_4575()` returns the value of its abort flag, so it
+## returns 0 when nobody touched a key and non-zero when somebody did. On 0
+## main sets `[0x9602] = 3` and loads road 0 — the DEMO.REC attract run. On
+## non-zero it opens the main menu. Sitting through the whole intro is the
+## ONLY way to reach the attract demo in the retail game; the port used to
+## start it after ten idle seconds on the main menu, which is the C
+## reference's invention (BUGS §11.11).
+func _end_intro(skipped: bool) -> void:
 	if _intro != null and is_instance_valid(_intro):
 		_intro.queue_free()
 	_intro = null
-	_open_menu(Menu.Screen.MAIN)
+	if skipped:
+		_open_menu(Menu.Screen.MAIN)
+	else:
+		_replaying = true
+		_begin(0)
 
 
 func _teardown() -> void:
@@ -159,7 +190,7 @@ func _teardown() -> void:
 			"help_page": _menu.help_page,
 		}
 	_paused = false
-	for n in [_menu, _world, _hud, _loop, _roadend]:
+	for n in [_menu, _world, _hud, _loop, _roadend, _touch]:
 		if n != null and is_instance_valid(n):
 			n.queue_free()
 	_menu = null
@@ -167,26 +198,46 @@ func _teardown() -> void:
 	_world = null
 	_hud = null
 	_loop = null
+	_touch = null
 	_in_game = false
 
 
 ## Every interactive transition goes through here (fade_to, game.c:86-92):
 ## fade to black, switch, fade back. Automated paths (--road/--replay/
 ## --shots/--menu-shot) call their targets directly and never fade.
-func _fade_transition(cb: Callable) -> void:
+##
+## `skippable` reproduces the original's abort flag. fn_4315 forces its
+## interpolation straight to t=100 when `[0x54ac]` is set, and fn_4137 sets
+## that on any keypress — but ONLY while armed by `[0xaf42]`, which fn_4575
+## raises at 0x470d for the intro and clears at 0x4a6f when it ends. So the
+## intro can be skipped through and nothing else can, which is why this is a
+## parameter rather than a blanket rule.
+func _fade_transition(cb: Callable, skippable := false) -> void:
 	if _fading:
 		return
 	_fading = true
+	_fade_skippable = skippable
+	_fade_cb = cb
 	if _loop != null and is_instance_valid(_loop):
 		_loop.paused = true          # nothing ticks during the fade-out
 	if _menu != null and is_instance_valid(_menu):
-		_menu.set_process(false)     # freeze the attract-idle timer
+		_menu.set_process(false)
 	var tw := create_tween()
+	_fade_tween = tw
 	tw.tween_property(_fade_rect, "color:a", 1.0, FADE_SECS)
-	tw.tween_callback(cb)
+	tw.tween_callback(func() -> void:
+		# through _fade_cb, so a skip and a normal run perform the same call
+		# exactly once whichever gets there first
+		var pending := _fade_cb
+		_fade_cb = Callable()
+		if pending.is_valid():
+			pending.call())
 	tw.tween_property(_fade_rect, "color:a", 0.0, FADE_SECS)
 	tw.tween_callback(func() -> void:
 		_fading = false
+		_fade_skippable = false
+		_fade_tween = null
+		_fade_cb = Callable()
 		if _menu != null and is_instance_valid(_menu):
 			_menu.set_process(true))
 
@@ -316,7 +367,16 @@ func _begin(index: int) -> void:
 		(SkyRoads.SCREEN_H - SkyRoads.DASH_PICT_Y) * SkyRoads.PIXEL_ASPECT)
 	_hud.add_child(dash)
 	_dash = Dashboard.new()
+	# A parity capture must reproduce the reference exactly, so the one
+	# documented dashboard deviation (BUGS #41's readable GRAV-O-METER) is
+	# off whenever frames are being measured.
+	_dash.authentic_gravity_window = _opt.is_parity_capture()
 	_hud.add_child(_dash)
+	if _touch_ui:
+		_touch = TouchControls.new()
+		_touch.mouse_fallback = _opt.force_touch
+		_touch.on_pause = _touch_pause
+		add_child(_touch)
 	_labels = CellLabels.new()
 	_hud.add_child(_labels)
 	_labels.setup(_camera)
@@ -470,17 +530,38 @@ func _capture_menu() -> void:
 
 func _unhandled_input(ev: InputEvent) -> void:
 	if _fading:
-		return                       # menus frozen during fades (game.c:398-402)
+		# Menus are frozen during fades (game.c:398-402) — except the
+		# intro's, which the original lets the player cut short.
+		if _fade_skippable and _is_confirm(ev):
+			_skip_fade()
+		return
 	if _intro != null:
 		_intro.handle_input(ev)
 	elif _roadend != null:
 		_roadend.handle_input(ev)
 	elif _menu != null:
 		_menu.handle_input(ev)
+	elif _in_game and _touch_ui and ev is InputEventScreenTouch \
+			and (ev as InputEventScreenTouch).pressed:
+		# The pause box has already claimed its own taps (TouchControls marks
+		# them handled), so anything reaching here is a tap on the playfield.
+		# A tap leaves the demo: a phone has no ESC, and the pause box is the
+		# documented stand-in for it.
+		if _replaying and road_index == 0:
+			_replaying = false
+			_fade_transition(_open_menu.bind(Menu.Screen.MAIN))
+		elif _paused:
+			_paused = false              # any input resumes (game.c:298-307)
+			_loop.paused = false
 	elif _in_game and ev is InputEventKey and ev.pressed and not ev.echo:
 		var key := (ev as InputEventKey).keycode
 		if _replaying and road_index == 0:
-			# attract demo: ANY key returns to the main menu (game.c:293-296)
+			# The attract demo is a road like any other, so only ESC leaves
+			# it — that is the play loop's result 7, and main @0x037a sends
+			# result 7 to the main menu. Every other key does nothing, here
+			# as in the game (BUGS §11.11).
+			if key != KEY_ESCAPE:
+				return
 			_replaying = false
 			_fade_transition(_open_menu.bind(Menu.Screen.MAIN))
 			return
@@ -524,9 +605,12 @@ func _process(_delta: float) -> void:
 		# current song (game.c enter_state, 73-80)
 		var ms: int = _menu.screen
 		if ms != _last_menu_screen:
-			if ms == Menu.Screen.MAIN:
-				_audio.want_song(0)
-			elif ms == Menu.Screen.GO:
+			# BOTH menus are song 1 in the retail binary: fn_4e36 @0x4e3f
+			# (main menu) and fn_5164 @0x5172 (road select) each call
+			# music_start(1). Song 0 belongs to the intro alone
+			# (fn_4575 @0x4586) — the port used to leave it playing over the
+			# main menu, so song 1 was only ever heard on the road select.
+			if ms == Menu.Screen.MAIN or ms == Menu.Screen.GO:
 				_audio.want_song(1)
 			_last_menu_screen = ms
 	# Presentation runs every frame and interpolates between ticks. Without
@@ -550,7 +634,11 @@ func _process(_delta: float) -> void:
 ## tested; this only reads the hardware.
 func _read_device() -> Array:
 	match PlayerInput.effective_device(_cfg.control,
-			Input.get_connected_joypads().size()):
+			Input.get_connected_joypads().size(), _touch_ui):
+		PlayerInput.Device.TOUCH:
+			# the on-screen stick has already done the thresholding, in
+			# PlayerInput.from_axes, exactly as the joystick does
+			return _touch.sample() if _touch != null else [0, 0, 0]
 		PlayerInput.Device.JOYSTICK:
 			var pad: int = Input.get_connected_joypads()[0]
 			# stick or d-pad, whichever the player uses
@@ -589,6 +677,104 @@ func _read_device() -> Array:
 				Input.is_action_pressed("sr_end"),
 				Input.is_action_pressed("sr_pgdn"),
 				Input.is_action_pressed("sr_jump"))
+
+
+## Android's back gesture and the application losing focus. Both are phone
+## facts with no DOS equivalent, and both are damaging if ignored: by default
+## Godot QUITS on a back press, so the system gesture would end a run outright,
+## and a phone call arriving mid-road would otherwise keep the simulation
+## running behind the lock screen.
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			_go_back()
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
+			# Mobile only, deliberately. On a desktop this fires whenever the
+			# window goes to the background, and an automated `--replay
+			# --shots` run that pauses there never terminates — it would hang
+			# verify.sh instead of failing it.
+			if OS.has_feature("mobile") and _in_game and not _paused \
+					and not _replaying \
+					and _loop != null and is_instance_valid(_loop):
+				_paused = true
+				_loop.paused = true
+
+
+## One screen back, wherever we are. This is Escape's job on a keyboard, so it
+## does Escape's job here rather than inventing a second navigation model.
+func _go_back() -> void:
+	if _fading:
+		return
+	if _intro != null:
+		_intro.handle_input(_escape_event())
+	elif _roadend != null:
+		_roadend.handle_input(_escape_event())
+	elif _menu != null:
+		_menu.handle_input(_escape_event())
+	elif _in_game:
+		_paused = false
+		_replaying = false
+		_fade_transition(_open_menu.bind(Menu.Screen.GO))
+
+
+## Any key or tap, which is what the original's fn_4137 watches for.
+static func _is_confirm(ev: InputEvent) -> bool:
+	if ev is InputEventKey:
+		return ev.pressed and not (ev as InputEventKey).echo
+	if ev is InputEventScreenTouch:
+		return (ev as InputEventScreenTouch).pressed
+	return false
+
+
+## Run the fade to its end immediately, the way fn_4315 does when its abort
+## flag is raised mid-interpolation.
+##
+## Done by hand rather than with `Tween.custom_step()`: stepping a tween that
+## the tree is also processing is documented as unreliable, and it showed —
+## the tween finished, its LAST callback ran and its middle one did not, so
+## the shell cleared `_fading` while the transition it was supposed to perform
+## never happened. The intro then sat on screen forever.
+func _skip_fade() -> void:
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = null
+	var cb := _fade_cb
+	_fade_cb = Callable()
+	_fade_rect.color.a = 0.0
+	_fading = false
+	_fade_skippable = false
+	if cb.is_valid():
+		cb.call()
+	if _menu != null and is_instance_valid(_menu):
+		_menu.set_process(true)
+
+
+func _escape_event() -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_ESCAPE
+	ev.pressed = true
+	return ev
+
+
+## The touch pause box, which is also the only "back" a phone has: tap once
+## to pause, tap it again to leave the road. That is the original's own pair
+## of behaviours (P pauses, ESC while paused quits to the road select,
+## game.c:298-313) reached with one control instead of two keys.
+func _touch_pause() -> void:
+	if not _in_game or _loop == null or _fading:
+		return
+	if _replaying:
+		# the original cannot pause the demo; a tap leaves it instead
+		_replaying = false
+		_fade_transition(_open_menu.bind(
+			Menu.Screen.MAIN if road_index == 0 else Menu.Screen.GO))
+		return
+	if _paused:
+		_paused = false
+		_fade_transition(_open_menu.bind(Menu.Screen.GO))
+	else:
+		_paused = true
+		_loop.paused = true
 
 
 ## A short-lived on-screen message. The recording filename is useless if the
@@ -649,8 +835,16 @@ func _on_finished(result: int) -> void:
 			% [_owed.size(), _owed] + "of frames (occluded on macOS)")
 	if _replaying and not _roadend_shot:
 		if _shot_dir.is_empty() and road_index == 0:
-			_replaying = false          # attract demo over: back to the menu
-			_fade_transition(_open_menu.bind(Menu.Screen.MAIN))
+			# A demo that ran to its end goes back to the INTRO, not to the
+			# menu: main @0x0385 jumps to 0x219, which is the `fn_4575()`
+			# call. Intro, demo, intro, demo — an arcade attract loop, and
+			# the answer to whether the intro ever replays. It does, here and
+			# only here.
+			_replaying = false
+			_fade_transition(func() -> void:
+				_teardown()
+				_audio.want_song(0)
+				_start_intro())
 			return
 		get_tree().quit(0 if result == SkyRoadsPlay.COMPLETE else 1)
 		return

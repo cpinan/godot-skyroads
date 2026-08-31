@@ -29,6 +29,35 @@ var _rows := 1
 var _art: Image
 var _prog_top := PackedInt32Array()   ## per-column top y, screen coords
 var _warn_masks := {}                 ## "oxy"/"fuel" -> [pixels@99, pixels@100]
+## Which of the GRAV-O-METER's four digit slots the art actually backs with a
+## black readout window. Measured from DASHBRD.LZS, not assumed — see
+## _precompute_gravity_window.
+var _grav_window := []
+
+## Reproduce the original's unreadable GRAV-O-METER exactly (BUGS #41).
+##
+## Settled against the retail binary and the retail art, so this is not a
+## guess about what DOS does:
+##
+##   SKYROADS.EXE fn_2b21 @0x2ba7 calls fn_1067(x=0x60, y=0x9c,
+##   value=(gravity-3)*100, ndigits=4); fn_1067 @0x1091-0x10cd draws digit si
+##   at x + (4-si-1)*5, i.e. slots 96/101/106/111; fn_0fc6 @0xfd6 paints
+##   stencil value 1 in palette 0x61 and 2 in 0x62. Palette 0x61 is
+##   (207,174,121) — the GRAV-O-METER panel's own tan. DASHBRD.LZS backs only
+##   the two RIGHTMOST slots (x 106..114) with palette index 0, which the
+##   dashboard stamp leaves as the framebuffer's black.
+##
+## So in the 1993 game any digit left of x=106 is painted tan on tan and
+## cannot be seen, and since (gravity-3)*100 always ends in "00" the visible
+## half of the readout reads "00" on every road ever shipped. That is
+## Bluemoon's bug, faithfully reproduced here — the port matches the C
+## reference at 0 differing pixels and both match the EXE.
+##
+## Left false, the port extends the art's own black window leftward over the
+## slots it does not cover, so the number can be read. It is the only
+## deliberate deviation in the dashboard, it changes nothing but the
+## background of two 4x5 cells, and Main switches it off for parity captures.
+var authentic_gravity_window := false
 
 
 func _ready() -> void:
@@ -43,6 +72,7 @@ func _ready() -> void:
 		_art = tex.get_image()
 		_precompute_progress()
 		_precompute_warn_masks()
+		_precompute_gravity_window()
 
 
 ## hud.c:98-107: each progress column's height comes from the art — read the
@@ -56,6 +86,25 @@ func _precompute_progress() -> void:
 		while yy >= 138 and _art.get_pixel(x, yy - SkyRoads.DASH_PICT_Y) == slot:
 			yy -= 1
 		_prog_top[i] = yy + 1
+
+
+## Which digit slots the art backs with the black readout window, read out of
+## DASHBRD.LZS rather than hard-coded: a slot is "windowed" when any pixel of
+## its 4x5 cell is palette index 0, which the dashboard stamp leaves black.
+## In the retail art that is slots 2 and 3 (screen x 106 and 111) and nothing
+## else, which is the whole of BUGS #41.
+func _precompute_gravity_window() -> void:
+	_grav_window.resize(SkyRoads.GRAVITY_DIGITS)
+	for si in SkyRoads.GRAVITY_DIGITS:
+		var x0: int = SkyRoads.GRAVITY_POS[0] + (SkyRoads.GRAVITY_DIGITS - 1 - si) * 5
+		var backed := false
+		for dy in 5:
+			for dx in 4:
+				var c := _art.get_pixel(x0 + dx,
+					SkyRoads.GRAVITY_POS[1] + dy - SkyRoads.DASH_PICT_Y)
+				if c.a < 0.5:
+					backed = true
+		_grav_window[si] = backed
 
 
 ## The EXE colour-swaps lamp pixels 0x63<->0x64 inside the warning rects
@@ -156,8 +205,15 @@ func _draw() -> void:
 		# least significant digit first, rightmost cell first
 		var shown := HudModel.gravity_digits(value)
 		for si in shown.size():
-			_stamp(digits[shown[si]], 4, 5,
-				SkyRoads.GRAVITY_POS[0] + (3 - si) * 5,
+			var x0: int = SkyRoads.GRAVITY_POS[0] + (3 - si) * 5
+			if not authentic_gravity_window and si < _grav_window.size() \
+					and not _grav_window[si]:
+				# the art has no readout window here, so a digit painted in
+				# 0x61 would be tan on tan — give it the window's own black
+				draw_rect(Rect2(
+					Vector2(x0, SkyRoads.GRAVITY_POS[1] * SkyRoads.PIXEL_ASPECT),
+					Vector2(4, 5 * SkyRoads.PIXEL_ASPECT)), _col(0), true)
+			_stamp(digits[shown[si]], 4, 5, x0,
 				SkyRoads.GRAVITY_POS[1], d1, d2)
 
 	# jump-o-master lamp, two states

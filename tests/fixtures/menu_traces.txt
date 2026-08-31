@@ -16,12 +16,18 @@ go-nav-and-launch,1,E,GO,0,0,0,0,0
 go-nav-and-launch,2,D,GO,0,1,0,0,0
 go-nav-and-launch,3,D,GO,0,2,0,0,0
 go-nav-and-launch,4,D,GO,0,3,0,0,0
+# CORRECTED 2026-08-30, and NOT from tools/menu_trace.c — rows 6-10.
+# fn_5164 does not guard left and right the way the C reference does. RIGHT is
+# an unconditional +15 with the loop-top clamp at 29 (@0x52e6, @0x527f) and
+# LEFT is -15 or, from anywhere in the first column, 0 (@0x52cb). So from 18:
+# R -> 33 -> 29, L -> 14, L -> 0, U -> 0 (already there), E -> road 1.
+# See BUGS §11.8 and §11.9.
 go-nav-and-launch,5,R,GO,0,18,0,0,0
-go-nav-and-launch,6,R,GO,0,18,0,0,0
-go-nav-and-launch,7,L,GO,0,3,0,0,0
-go-nav-and-launch,8,L,GO,0,3,0,0,0
-go-nav-and-launch,9,U,GO,0,2,0,0,0
-go-nav-and-launch,10,E,GAME,0,2,0,0,3
+go-nav-and-launch,6,R,GO,0,29,0,0,0
+go-nav-and-launch,7,L,GO,0,14,0,0,0
+go-nav-and-launch,8,L,GO,0,0,0,0,0
+go-nav-and-launch,9,U,GO,0,0,0,0,0
+go-nav-and-launch,10,E,GAME,0,0,0,0,1
 go-clamp-bottom,0,-,MAIN,0,0,0,0,0
 go-clamp-bottom,1,E,GO,0,0,0,0,0
 go-clamp-bottom,2,D,GO,0,1,0,0,0
@@ -98,10 +104,16 @@ settings-row-hop,7,E,SET,1,0,0,0,0
 help-pages-wrap,0,-,MAIN,0,0,0,0,0
 help-pages-wrap,1,D,MAIN,1,0,0,0,0
 help-pages-wrap,2,D,MAIN,2,0,0,0,0
+# CORRECTED 2026-08-30, and NOT from tools/menu_trace.c. The C engine pages
+# until HELPMENU.LZS runs out and the retail file holds three screens, so its
+# trace had a third page here. The retail binary shows TWO: fn_4e12 @0x4e21
+# calls the one-page routine fn_4dac, then calls it again only if the key was
+# not ESC, then returns. helpmenu_2 is art the 1993 game never displays.
+# Regenerating this file from the C engine will silently reintroduce the bug —
+# keep these four rows.
 help-pages-wrap,3,E,HELP,2,0,0,0,0
 help-pages-wrap,4,E,HELP,2,0,0,1,0
-help-pages-wrap,5,E,HELP,2,0,0,2,0
-help-pages-wrap,6,E,MAIN,2,0,0,0,0
+help-pages-wrap,5,E,MAIN,2,0,0,0,0
 help-escape,0,-,MAIN,0,0,0,0,0
 help-escape,1,D,MAIN,1,0,0,0,0
 help-escape,2,D,MAIN,2,0,0,0,0

@@ -90,6 +90,25 @@ for t in "$HERE"/tests/render_*.gd "$HERE"/tests/test_occlusion.gd; do
     fi
 done
 
+# The touch shell runs on its own: it needs `-- --touch` (the phone controls
+# are off on a desktop by design) and it pushes synthetic touches through the
+# real input pipeline, so it needs a window like the pixel suites do.
+if [ -e "$HERE/tests/touch_shell.gd" ]; then
+    out=$("$GODOT" --path "$HERE" --resolution 640x480 \
+        --script res://tests/touch_shell.gd -- --touch 2>&1)
+    if printf '%s' "$out" | grep -q "^Result:"; then
+        printf '%s\n' "$out" | grep -E "^Result:" | sed 's/^/       /'
+        if printf '%s' "$out" | grep -q "FAIL"; then
+            printf '%s\n' "$out" | grep "FAIL" | sed 's/^/       /'
+            echo "  FAIL touch_shell.gd"; status=1
+        else
+            echo "  ok   touch_shell.gd"
+        fi
+    else
+        echo "  FAIL touch_shell.gd (no Result line)"; status=1
+    fi
+fi
+
 echo
 echo "== suites =="
 for t in "$HERE"/tests/test_*.gd; do

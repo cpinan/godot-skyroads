@@ -30,7 +30,9 @@ func check(cond: bool, label: String) -> void:
 func _init() -> void:
 	_differential()
 	_boundaries()
-	_attract_demo()
+	_no_attract_in_the_menus()
+	_exe_navigation()
+	_touch_settings()
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -39,7 +41,7 @@ func _init() -> void:
 ## rather than screens here, because the shell hands control back to Main.
 func _state_name(m: MenuModel) -> String:
 	match m.exit:
-		MenuModel.Exit.PLAY, MenuModel.Exit.DEMO:
+		MenuModel.Exit.PLAY:
 			return "GAME"
 		MenuModel.Exit.QUIT:
 			return "QUIT"
@@ -55,8 +57,8 @@ func _differential() -> void:
 	f.get_line()                                  # header
 	while not f.eof_reached():
 		var line := f.get_line().strip_edges()
-		if line.is_empty():
-			continue
+		if line.is_empty() or line.begins_with("#"):
+			continue                 # '#' marks a note, see the fixture header
 		rows.append(line.split(","))
 	var scripts := {}
 	for r in rows:
@@ -141,28 +143,142 @@ func _boundaries() -> void:
 		"the last page returns to the main menu")
 
 
-func _attract_demo() -> void:
+## There is no attract timer in any menu, and this asserts the absence.
+##
+## The retail menus read keys with fn_5fad, a blocking `int 21h ah=7`, so they
+## cannot time out — the demo is reached by letting the intro finish instead
+## (main @0x0221-0x022f, BUGS §11.11). The port used to count ten idle seconds
+## on the main menu, from game.c:200. If that ever comes back, a player who
+## walks away mid-menu gets dropped into a demo the original would never have
+## started.
+func _no_attract_in_the_menus() -> void:
 	var m := MenuModel.new()
-	check(m.advance(MenuModel.ATTRACT_IDLE_TICKS) == false
-		or m.exit == MenuModel.Exit.NONE,
-		"the attract demo has not started one tick early")
-	check(m.exit == MenuModel.Exit.NONE,
-		"idle for exactly 10 s does not start the demo yet")
-	m.advance(2)
-	check(m.exit == MenuModel.Exit.DEMO,
-		"idle past 10 s starts the attract demo")
+	check(not ("DEMO" in MenuModel.Exit.keys()),
+		"there is no DEMO exit for a menu to take")
+	# a long idle on every screen, and nothing must happen
+	for screen in [MenuModel.Screen.MAIN, MenuModel.Screen.GO,
+			MenuModel.Screen.SETTINGS, MenuModel.Screen.HELP]:
+		m = MenuModel.new()
+		m.screen = screen
+		var fingerprint := [m.screen, m.main_sel, m.go_sel, m.set_sel,
+			m.help_page]
+		var changed := false
+		for _i in 36 * 60:                       # a minute of nothing
+			if m.step():
+				changed = true
+		check(not changed and m.exit == MenuModel.Exit.NONE,
+			"screen %d does nothing at all when left alone for a minute"
+			% screen)
+		check(fingerprint == [m.screen, m.main_sel, m.go_sel, m.set_sel,
+			m.help_page], "and its state is untouched")
 
-	# any key resets the countdown
-	m = MenuModel.new()
-	m.advance(MenuModel.ATTRACT_IDLE_TICKS)
-	m.step([MenuModel.Key.DOWN])
-	m.advance(10)
-	check(m.exit == MenuModel.Exit.NONE,
-		"a keypress resets the attract countdown")
 
-	# and it only runs on the main menu
-	m = MenuModel.new()
-	m.screen = MenuModel.Screen.GO
-	m.advance(MenuModel.ATTRACT_IDLE_TICKS * 2)
-	check(m.exit == MenuModel.Exit.NONE,
-		"the road-select screen never starts the attract demo")
+## On a phone the settings screen's first three items pick a control device
+## that the hardware has already decided, so the cursor must not be able to
+## reach them. The sound row must be exactly as reachable as it always was —
+## the failure this guards against is not "the control row is still there",
+## it is "the clamp ate the sound setting too".
+func _touch_settings() -> void:
+	var m := MenuModel.new()
+	m.touch_ui = true
+	m.screen = MenuModel.Screen.SETTINGS
+	check(m.settings_first_item() == MenuModel.SETTINGS_SOUND_FIRST,
+		"touch_ui moves the first reachable settings item to the sound row")
+
+	# a cfg carried over from a desktop leaves set_sel on the control row
+	m.set_sel = 1
+	m.step([])
+	check(m.set_sel == 3,
+		"entering with a control item selected lands on sound-on")
+	m.sound_off = true
+	m.set_sel = 0
+	m.step([])
+	check(m.set_sel == 4, "and on sound-off when that is the current setting")
+
+	# left cannot walk out of the sound row, up cannot hop out of it
+	m.set_sel = 3
+	for _i in 5:
+		m.step([MenuModel.Key.LEFT])
+	check(m.set_sel == 3, "left is clamped at the first sound item")
+	m.step([MenuModel.Key.UP])
+	check(m.set_sel == 3, "up does not hop to the control row")
+	m.step([MenuModel.Key.RIGHT])
+	check(m.set_sel == 4, "right still moves within the sound row")
+	m.step([MenuModel.Key.UP])
+	check(m.set_sel == 4, "and up from the second sound item stays put")
+
+	# confirming can only ever change the sound setting
+	m.control = 0
+	m.step([MenuModel.Key.ENTER])
+	check(m.sound_off and m.control == 0,
+		"confirm on the sound row turns sound off and leaves control alone")
+	m.set_sel = 3
+	m.step([MenuModel.Key.ENTER])
+	check(not m.sound_off and m.control == 0, "and back on again")
+	check(m.screen == MenuModel.Screen.SETTINGS,
+		"none of that left the settings screen")
+
+	# ESC must still work, or a phone reaches a screen it cannot leave
+	m.step([MenuModel.Key.ESCAPE])
+	check(m.screen == MenuModel.Screen.MAIN, "escape still returns to MAIN")
+
+	# and with touch_ui off nothing above applies: this is the same class the
+	# C-engine differential above drives, and it must be untouched by it
+	var d := MenuModel.new()
+	d.screen = MenuModel.Screen.SETTINGS
+	d.set_sel = 3
+	d.step([MenuModel.Key.UP])
+	check(d.set_sel == 0,
+		"without touch_ui the sound row still hops up to the control row")
+	d.step([MenuModel.Key.ENTER])
+	check(d.control == 0 and d.settings_dirty,
+		"and the control device is still selectable there")
+
+
+## The EXE's own navigation rules, at the boundaries the traces do not reach.
+func _exe_navigation() -> void:
+	# LEFT anywhere in the first column goes to road 1, it does not refuse
+	for start in [0, 1, 7, 14]:
+		var m := MenuModel.new()
+		m.screen = MenuModel.Screen.GO
+		m.go_sel = start
+		m.step([MenuModel.Key.LEFT])
+		check(m.go_sel == 0, "left from road %d lands on road 1" % (start + 1))
+	# RIGHT from the second column runs to the end of the list
+	for start in [15, 20, 29]:
+		var m := MenuModel.new()
+		m.screen = MenuModel.Screen.GO
+		m.go_sel = start
+		m.step([MenuModel.Key.RIGHT])
+		check(m.go_sel == 29,
+			"right from road %d lands on road 30" % (start + 1))
+	# and the pair is not symmetric: right then left does not come home
+	var r := MenuModel.new()
+	r.screen = MenuModel.Screen.GO
+	r.go_sel = 20
+	r.step([MenuModel.Key.RIGHT])
+	r.step([MenuModel.Key.LEFT])
+	check(r.go_sel == 14, "right-then-left from road 21 ends on road 15")
+
+	# space confirms nothing outside the help screen
+	for screen in [MenuModel.Screen.MAIN, MenuModel.Screen.GO,
+			MenuModel.Screen.SETTINGS]:
+		var m := MenuModel.new()
+		m.screen = screen
+		var before := [m.screen, m.exit, m.control, m.sound_off]
+		m.step([MenuModel.Key.JUMP])
+		check([m.screen, m.exit, m.control, m.sound_off] == before,
+			"space does nothing on screen %d" % screen)
+
+	# but the help screen turns its page on ANY key that is not escape
+	for key in [MenuModel.Key.JUMP, MenuModel.Key.UP, MenuModel.Key.LEFT,
+			MenuModel.Key.ENTER]:
+		var m := MenuModel.new()
+		m.screen = MenuModel.Screen.HELP
+		m.step([key])
+		check(m.help_page == 1, "help pages on key %d" % key)
+	var h := MenuModel.new()
+	h.screen = MenuModel.Screen.HELP
+	h.step([MenuModel.Key.ESCAPE])
+	check(h.screen == MenuModel.Screen.MAIN and h.help_page == 0,
+		"escape leaves help instead of paging it")

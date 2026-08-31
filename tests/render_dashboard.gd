@@ -34,22 +34,26 @@ func _init() -> void:
 	# on frames the capture harness produced rather than re-implementing the
 	# loop. verify.sh passes the directory; without it the test self-skips
 	# rather than silently passing.
+	# The golden comparison needs a capture run; the two scenarios below build
+	# their own dashboard and do not, so they run either way. Skipping the
+	# whole suite when the harness has not captured is how a rendering test
+	# quietly stops testing.
 	var dir := OS.get_environment("SR_DASH_SHOTS")
 	if dir.is_empty():
-		print("  (no SR_DASH_SHOTS directory — dashboard parity not checked)")
-		print("Result: %d checks, %d failures" % [_checks, _failures])
-		quit(0)
-		return
-	for tick in [100, 240, 420, 640]:
-		var frac := _compare(dir, tick)
-		if frac < 0.0:
-			check(false, "tick %d: capture or golden missing" % tick)
-			continue
-		print("  dash t%04d       differing %.3f%%" % [tick, frac * 100.0])
-		check(frac <= MAX_DIFF_FRACTION,
-			"dashboard at tick %d matches the C reference (%.3f%% differ)"
-			% [tick, frac * 100.0])
+		print("  (no SR_DASH_SHOTS directory — golden parity not checked)")
+	else:
+		for tick in [100, 240, 420, 640]:
+			var frac := _compare(dir, tick)
+			if frac < 0.0:
+				check(false, "tick %d: capture or golden missing" % tick)
+				continue
+			print("  dash t%04d       differing %.3f%%" % [tick, frac * 100.0])
+			check(frac <= MAX_DIFF_FRACTION,
+				"dashboard at tick %d matches the C reference (%.3f%% differ)"
+				% [tick, frac * 100.0])
 	await _jump_o_master()
+	await _gravity_readout()
+	_cowl_silhouette()
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -102,6 +106,148 @@ func _jump_o_master() -> void:
 	print("  jump-o-master   IDLE vs IN USE differ by %d px" % differ)
 	check(differ > 50,
 		"the landing-assist readout changes with ap_light (%d px)" % differ)
+
+
+## BUGS #41: the GRAV-O-METER's black readout window is two digit slots wide
+## and the code draws up to four, in a colour that IS the panel, so in the
+## retail game any digit left of x=106 cannot be seen. That is settled — it is
+## in SKYROADS.EXE (fn_1067 @0x1091, fn_0fc6 @0xfd6) and in DASHBRD.LZS — so
+## what is tested here is not "which is right" but that the port can still do
+## both, and that the parity path is the authentic one.
+##
+## The failure this catches is the deviation leaking into a measured run: if
+## Main ever stops passing is_parity_capture() through, the dashboard suite
+## above starts comparing a readable gauge against a reference that has an
+## unreadable one, and does it 60 rows away from where anyone is looking.
+func _gravity_readout() -> void:
+	var road := RoadData.load_json("res://data/levels/road_01.json")
+	if road == null:
+		check(false, "road 1 loads")
+		return
+	var cl := CanvasLayer.new()
+	get_root().add_child(cl)
+	var art := TextureRect.new()
+	art.texture = load("res://data/gfx/dashbrd_0.png")
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_SCALE
+	art.position = Vector2(0, SkyRoads.DASH_PICT_Y * SkyRoads.PIXEL_ASPECT)
+	art.size = Vector2(SkyRoads.SCREEN_W,
+		(SkyRoads.SCREEN_H - SkyRoads.DASH_PICT_Y) * SkyRoads.PIXEL_ASPECT)
+	cl.add_child(art)
+	var dash := Dashboard.new()
+	cl.add_child(dash)
+	await process_frame
+
+	# gravity 8 is the typical road: (8-3)*100 = 500, three digits, so the
+	# hundreds digit lands on the slot the art does not back
+	check(HudModel.gravity_digits(HudModel.gravity_value(8)).size() == 3,
+		"gravity 8 asks for three digits")
+
+	var shot: Array[Image] = []
+	for authentic in [true, false]:
+		dash.authentic_gravity_window = authentic
+		var play := SkyRoadsPlay.new(road)
+		dash.update(play, road.rows)
+		for _i in 3:
+			await process_frame
+		RenderingServer.force_draw()
+		RenderingServer.force_draw()
+		shot.append(get_root().get_texture().get_image())
+	cl.queue_free()
+	await process_frame
+
+	# slot 2 of 4 — the hundreds digit, 4x5 at screen x 101, y 156
+	var x0: int = SkyRoads.GRAVITY_POS[0] + 5
+	var dark_authentic := _dark_pixels(shot[0], x0, SkyRoads.GRAVITY_POS[1])
+	var dark_readable := _dark_pixels(shot[1], x0, SkyRoads.GRAVITY_POS[1])
+	print("  grav-o-meter    hundreds slot dark px: authentic %d, readable %d"
+		% [dark_authentic, dark_readable])
+	check(dark_authentic == 0,
+		"authentic: the hundreds digit is painted on bare panel, no window")
+	check(dark_readable >= 6,
+		"readable: the window is extended under it (%d dark px)"
+		% dark_readable)
+
+
+## Dark pixels inside a 4x5 digit cell, sampled in the frame's own scale.
+## "Dark" is the readout window: the dashboard art's index 0, which the DOS
+## stamp leaves as the framebuffer's black. The panel around it is
+## (207,174,121) and (211,182,85), so the threshold has an enormous margin.
+func _dark_pixels(img: Image, sx: int, sy: int) -> int:
+	var w := img.get_width()
+	var h := img.get_height()
+	var n := 0
+	for dy in 5:
+		var y := int((float(sy + dy) + 0.5) * SkyRoads.PIXEL_ASPECT
+			* float(h) / SkyRoads.SQUARE_H)
+		for dx in 4:
+			var x := int((float(sx + dx) + 0.5) * float(w) / SkyRoads.SCREEN_W)
+			var c := img.get_pixel(clampi(x, 0, w - 1), clampi(y, 0, h - 1))
+			if c.r8 < 64 and c.g8 < 64 and c.b8 < 64:
+				n += 1
+	return n
+
+
+## The dashboard cowl clips the ship, and this port never wrote that code.
+##
+## The original masks the sprite and its shadow against `ds:0x44a` — 138 half
+## widths, zero above row 129, then {89,111,123,133,138,143,148,153,158} — so
+## a low-flying ship disappears behind the dashboard's trapezoidal top edge
+## (renderer.md §7.2, fn_32a5 @0x32da). The port gets it for free: the
+## dashboard art is a CanvasLayer drawn after the 3D world, so the silhouette
+## doing the clipping is the art's own opaque pixels.
+##
+## "For free" is a claim, and this is the check on it: the art's opaque span
+## must BE the mask. If a future export ever changes the cowl's shape, or
+## something makes those rows transparent, the ship starts showing through a
+## dashboard it should be behind and no other test would notice.
+func _cowl_silhouette() -> void:
+	var tf := FileAccess.open("res://data/tables.json", FileAccess.READ)
+	if tf == null:
+		check(false, "tables.json loads")
+		return
+	var cowl: Array = (JSON.parse_string(tf.get_as_text())
+		as Dictionary).get("cowl", [])
+	check(cowl.size() == 138, "the cowl table is 138 rows (%d)" % cowl.size())
+	var tex: Texture2D = load("res://data/gfx/dashbrd_0.png")
+	if tex == null or cowl.is_empty():
+		check(false, "the dashboard art loads")
+		return
+	var art := tex.get_image()
+	var worst_edge := 0
+	var holes := 0
+	var rows := 0
+	for y in cowl.size():
+		var half := int(cowl[y])
+		if half == 0:
+			continue                       # unobstructed row, nothing to check
+		rows += 1
+		var ay: int = y - SkyRoads.DASH_PICT_Y
+		if ay < 0 or ay >= art.get_height():
+			check(false, "cowl row %d is inside the dashboard picture" % y)
+			continue
+		var lo := -1
+		var hi := -1
+		for x in SkyRoads.SCREEN_W:
+			if art.get_pixel(x, ay).a > 0.5:
+				if lo < 0:
+					lo = x
+				hi = x
+		worst_edge = maxi(worst_edge, absi(lo - (160 - half)))
+		worst_edge = maxi(worst_edge, absi(hi - (160 + half)))
+		for x in range(maxi(0, 160 - half), mini(SkyRoads.SCREEN_W, 160 + half)):
+			if art.get_pixel(x, ay).a <= 0.5:
+				holes += 1
+	print("  cowl            %d masked rows, worst edge %d px, %d interior holes"
+		% [rows, worst_edge, holes])
+	check(rows == 9, "nine rows are masked, 129..137 (%d)" % rows)
+	# the art and the table are two encodings of one trapezoid; they agree to
+	# within the edge pixel the mask rounds differently
+	check(worst_edge <= 2,
+		"the art's opaque span is the mask's band (worst edge %d px)"
+		% worst_edge)
+	# a hole inside the band is a place the ship would show through the cowl
+	check(holes <= 2, "the band is solid (%d transparent pixels)" % holes)
 
 
 func _compare(dir: String, tick: int) -> float:

@@ -85,5 +85,22 @@ func _init() -> void:
 		"an unknown option is reported, not swallowed (%s)" % [o.unknown])
 	check(o.road_index == 4, "and the rest of the line still parses")
 
+	# Deviations from the original are switched off whenever frames are being
+	# measured. Getting this wrong is invisible: the pixel suites would carry
+	# on passing right up to the moment they compare a deviation against a
+	# reference that does not have one.
+	check(not _p(["--road", "2"]).is_parity_capture(),
+		"an ordinary run is not a parity capture")
+	check(_p(["--replay", "1", "--shots", "/tmp/x"]).is_parity_capture(),
+		"--shots makes a run a parity capture")
+	check(_p(["--menu-shot", "go:0"]).is_parity_capture(),
+		"--menu-shot does too")
+	check(_p(["--authentic"]).is_parity_capture(),
+		"--authentic forces it without capturing anything")
+	check(_p(["--road", "2", "--touch"]).force_touch,
+		"--touch asks for the on-screen controls")
+	check(not _p(["--road", "2"]).force_touch,
+		"and is off by default, so a desktop build has no touch layer")
+
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)

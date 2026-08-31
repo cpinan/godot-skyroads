@@ -47,8 +47,48 @@ func _init() -> void:
 		check(frac >= 0.0, "%s rendered at all" % c[0])
 		check(frac >= 0.0 and frac <= MAX_DIFF_FRACTION,
 			"%s matches the C reference (%.3f%% differ)" % [c[0], frac * 100.0])
+	await _touch_navigation()
+	await _touch_settings_mask()
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
+
+
+## The settings goldens are C-engine frames, and the C engine does not draw
+## the original's orange "this is the current setting" overlays — see BUGS
+## §11 and the retraction in §8.3. Rather than compare against a reference
+## that is known to be missing something, the missing thing is added here:
+## the orange picts are the retail art, blitted at their own PICT offsets the
+## way fn_4ae2 does, over an otherwise verified frame. A fresh Config is
+## keyboard + sound on, so items 0 and 3 are the marked ones.
+##
+## This is the honest version of "regenerate the goldens": the pixels come
+## from the retail data, not from this port's output, so the test still
+## measures the port against the original rather than against itself.
+func _add_state_overlays(golden: Image) -> void:
+	var gf := FileAccess.open("res://data/gfx/gfx.json", FileAccess.READ)
+	if gf == null:
+		return
+	var files: Dictionary = (JSON.parse_string(gf.get_as_text())
+		as Dictionary)["files"]
+	# The goldens are RGB8. Blending an RGBA source into them is what the
+	# overlay needs — converting the SOURCE down to RGB8 instead throws its
+	# alpha away and pastes the whole rectangle opaque, which is an 8% "diff"
+	# that looks exactly like a real regression.
+	if golden.get_format() != Image.FORMAT_RGBA8:
+		golden.convert(Image.FORMAT_RGBA8)
+	for item in [0, MenuModel.SETTINGS_SOUND_FIRST]:
+		var name := "setmenu_%d.png" % (Menu.SET_STATE_FIRST + item)
+		for e in files.get("setmenu", []):
+			if e["file"] != name:
+				continue
+			var src := Image.load_from_file("res://data/gfx/%s" % name)
+			if src == null:
+				continue
+			if src.get_format() != Image.FORMAT_RGBA8:
+				src.convert(Image.FORMAT_RGBA8)
+			golden.blend_rect(src,
+				Rect2i(0, 0, src.get_width(), src.get_height()),
+				Vector2i(int(e["screen_x"]), int(e["screen_y"])))
 
 
 ## Returns the fraction of pixels differing from the golden, or -1 if the
@@ -58,9 +98,12 @@ func _compare(golden_name: String, screen: int, sel: int) -> float:
 		"res://tests/fixtures/golden/%s.png" % golden_name)
 	if golden == null:
 		return -1.0
+	if screen == Menu.Screen.SETTINGS:
+		_add_state_overlays(golden)
 
 	var menu := Menu.new()
 	menu.cfg = Config.new()
+	menu.cfg.path = "user://test_menu_scratch.cfg"
 	# the goldens were taken with this completion pattern, which is what puts
 	# a varying number of tick marks on the road-select screen
 	for r in 30:
@@ -111,3 +154,135 @@ func _compare(golden_name: String, screen: int, sel: int) -> float:
 					or absi(int(a.b8) - int(b.b8)) > TOLERANCE:
 				diff += 1
 	return float(diff) / float(w * h)
+
+
+## A phone has no Enter key, so the menus have to be reachable by tap. The hot
+## regions are the original's own overlay picts out of gfx.json rather than
+## coordinates typed in by hand, which is the only reason they can be trusted
+## not to drift away from the art — but it also means a wrong lookup fails
+## silently, as a menu that simply ignores taps. Hence this.
+func _touch_navigation() -> void:
+	var menu := _fresh_menu()
+	menu.touch_ui = true
+	get_root().add_child(menu)
+	await process_frame
+
+	# MAIN: the three items share one 68x57 box; tapping the middle third
+	# must select and confirm item 1, the settings screen
+	var started := [-1]
+	menu.start_road.connect(func(i: int) -> void: started[0] = i)
+	menu.screen = Menu.Screen.MAIN
+	menu.handle_input(_tap(menu, menu._main_item_rect(1).get_center()))
+	check(menu.screen == Menu.Screen.SETTINGS,
+		"tapping the second main-menu item opens the settings screen")
+
+	# SETTINGS with touch_ui: a tap on a control item is out of reach, a tap
+	# on the sound row commits, a tap on neither backs out
+	menu.set_sel = 3
+	menu.handle_input(_tap(menu, menu._item_rect(1).get_center()))
+	check(menu.screen == Menu.Screen.SETTINGS and menu.set_sel == 3,
+		"a tap on a dimmed control item changes nothing")
+	menu.handle_input(_tap(menu, menu._item_rect(4).get_center()))
+	check(menu.set_sel == 4 and menu.cfg.sound_off == 1,
+		"a tap on sound-off selects it and commits")
+	menu.handle_input(_tap(menu, Vector2(2, 2)))
+	check(menu.screen == Menu.Screen.MAIN,
+		"a tap on no item at all backs out to the main menu")
+
+	# GO: a tap selects, a second tap on the SAME road starts it. One tap
+	# starting a road would launch one on nearly every mis-touch.
+	menu.screen = Menu.Screen.GO
+	menu.go_sel = 0
+	var c := Menu.road_cell(12)
+	var p := Vector2(float(c.x) + 24.0,
+		(float(c.y) + 4.0) * SkyRoads.PIXEL_ASPECT)
+	menu.handle_input(_tap(menu, p))
+	check(menu.go_sel == 12 and started[0] == -1,
+		"the first tap on a road only moves the cursor")
+	menu.handle_input(_tap(menu, p))
+	check(started[0] == 13, "the second tap starts it (entry = index + 1)")
+
+	# and with touch_ui off, taps must do nothing at all — a desktop build
+	# must not gain a second, undocumented control scheme
+	menu.touch_ui = false
+	menu.screen = Menu.Screen.MAIN
+	menu.handle_input(_tap(menu, menu._main_item_rect(2).get_center()))
+	check(menu.screen == Menu.Screen.MAIN,
+		"without touch_ui a tap is ignored")
+	menu.queue_free()
+	await process_frame
+
+
+## The three control-device items must actually be covered on a phone, not
+## merely unreachable: an item that still looks live is an item players tap.
+func _touch_settings_mask() -> void:
+	var shots: Array[Image] = []
+	for touch in [false, true]:
+		var menu := _fresh_menu()
+		menu.touch_ui = touch
+		menu.screen = Menu.Screen.SETTINGS
+		menu.set_sel = 3
+		get_root().add_child(menu)
+		for _i in 4:
+			await process_frame
+		RenderingServer.force_draw()
+		RenderingServer.force_draw()
+		shots.append(get_root().get_texture().get_image())
+		menu.queue_free()
+		await process_frame
+
+	# inside the first control item, and inside the sound item next to it
+	var covered := _mean_luma(shots[1], _rect_of(shots[1], 46, 58, 77, 50))
+	var before := _mean_luma(shots[0], _rect_of(shots[0], 46, 58, 77, 50))
+	var sound_after := _mean_luma(shots[1], _rect_of(shots[1], 93, 108, 55, 38))
+	var sound_before := _mean_luma(shots[0], _rect_of(shots[0], 93, 108, 55, 38))
+	print("  settings mask   control item %.1f -> %.1f, sound item %.1f -> %.1f"
+		% [before, covered, sound_before, sound_after])
+	check(covered < before * 0.6,
+		"the control-device items are dimmed on a phone (%.1f -> %.1f)"
+		% [before, covered])
+	check(absf(sound_after - sound_before) < 2.0,
+		"the sound row is left exactly as it was (%.1f -> %.1f)"
+		% [sound_before, sound_after])
+
+
+## A menu whose config is a scratch file. The settings screen commits through
+## Config.save_file(), so a suite that taps it must not be pointed at
+## user://skyroads.cfg — the player's save is not test scaffolding.
+func _fresh_menu() -> Menu:
+	var menu := Menu.new()
+	menu.cfg = Config.new()
+	menu.cfg.path = "user://test_menu_scratch.cfg"
+	return menu
+
+
+## A press event at a point given in the menu's own canvas space.
+func _tap(menu: Menu, canvas_pos: Vector2) -> InputEventScreenTouch:
+	var ev := InputEventScreenTouch.new()
+	ev.pressed = true
+	ev.index = 0
+	ev.position = menu._overlay.get_global_transform() * canvas_pos
+	return ev
+
+
+## A pict rectangle (original 320x200 coordinates) mapped into a capture.
+func _rect_of(img: Image, x: int, y: int, w: int, h: int) -> Rect2i:
+	var iw := img.get_width()
+	var ih := img.get_height()
+	var sx := int(float(x) * iw / SkyRoads.SCREEN_W)
+	var sy := int(float(y) * SkyRoads.PIXEL_ASPECT * ih / SkyRoads.SQUARE_H)
+	var sw := int(float(w) * iw / SkyRoads.SCREEN_W)
+	var sh := int(float(h) * SkyRoads.PIXEL_ASPECT * ih / SkyRoads.SQUARE_H)
+	return Rect2i(sx, sy, maxi(sw, 1), maxi(sh, 1))
+
+
+func _mean_luma(img: Image, r: Rect2i) -> float:
+	var total := 0.0
+	var n := 0
+	for y in range(r.position.y, mini(r.end.y, img.get_height())):
+		for x in range(r.position.x, mini(r.end.x, img.get_width())):
+			var c := img.get_pixel(x, y)
+			total += float(c.r8) * 0.299 + float(c.g8) * 0.587 \
+				+ float(c.b8) * 0.114
+			n += 1
+	return total / maxf(float(n), 1.0)

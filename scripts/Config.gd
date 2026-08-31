@@ -13,6 +13,13 @@ const PATH := "user://skyroads.cfg"
 const WORDS := 33
 const BYTES := 66
 
+## Where this instance reads and writes. Overridable for exactly one reason:
+## a test that drives the settings screen commits through the real view, and
+## the view's job is to persist — so without this a suite run silently
+## overwrites the player's save, sound flag and thirty completion counters
+## included. It happened.
+var path := PATH
+
 var control := 0        ## 0 keyboard, 1 joystick, 2 mouse
 var sound_off := 0
 var completions := PackedInt32Array()
@@ -30,7 +37,7 @@ static func _checksum(w: PackedInt32Array) -> int:
 
 
 func load_file() -> bool:
-	var f := FileAccess.open(PATH, FileAccess.READ)
+	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null or f.get_length() < BYTES:
 		return false
 	var w := PackedInt32Array()
@@ -54,7 +61,7 @@ func save_file() -> void:
 	for i in 30:
 		w[3 + i] = completions[i]
 	w[0] = _checksum(w)
-	var f := FileAccess.open(PATH, FileAccess.WRITE)
+	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return
 	for i in WORDS:
