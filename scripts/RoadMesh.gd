@@ -282,17 +282,20 @@ func _emit_cell(floor_st: SurfaceTool, solid_st: SurfaceTool,
 			_block(solid_st, x0, x1, z0, z1, SkyRoadsCamera.FULL_BLOCK_Y,
 				code, false, col)
 		5:
-			# compose_tun_high (render.c:225-251) is NOT a bored block: it
-			# seeks kind 4 and paints the same six arch records a plain
-			# tunnel does — without the rims — and then puts a block tier on
-			# top through kind 5. So the lower half of the cell is a real
-			# tunnel and only the upper half is masonry. Drawing it as one
-			# solid block is what made road 2's roadside tunnels read as
-			# plain walls at rows 80-83.
-			_tunnel(solid_st, x0, x1, z0, z1, false, col,
-				TUNNEL_WALL_COLOUR)
+			# A tun_high is a FULL-HEIGHT BLOCK WITH A BORE, not a tunnel
+			# with a tier on top. The retail composer at 0x2fb0 is the kind-4
+			# full block with one substitution: where kind 4 draws the plain
+			# lower front (kind-3 record 0), this draws the kind-3 PAIR that
+			# splits that front around the bore, plus the bore's interior
+			# from kind 1 at colour 0x41. It never seeks kind 4, so none of
+			# the six arch-gradient records a plain tunnel paints appear on
+			# it — which is what the C reference (render.c compose_tun_high)
+			# had wrong, and what put a band of vault under this tier.
+			# The bore is the same ARCH_BORE_PX the geom-3 blocks use:
+			# decoded at phase 0 / dr7 / ci1 the kind-3 pair carves 16 px of
+			# height at the lane centre and 20 px of half-width at the deck.
 			_block(solid_st, x0, x1, z0, z1, SkyRoadsCamera.FULL_BLOCK_Y,
-				code, false, col, SkyRoadsCamera.HALF_BLOCK_Y)
+				code, true, col)
 		1:
 			# the front wall is only drawn at the MOUTH — the original tests
 			# "nearer row's shape < 1" (composer 0x303d). Drawing it for every
