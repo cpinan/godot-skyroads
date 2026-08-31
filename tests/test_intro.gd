@@ -114,9 +114,13 @@ func _sequence() -> void:
 			finished_at = t
 			break
 
+	# PORT_CREDIT is this port's own plate, appended after the original five
+	# (BUGS "a Godot port credit"). It is deliberately part of the sequence and
+	# deliberately last before OVER: the retail phases above it are unchanged,
+	# which is what this check is really guarding.
 	check(seen == [Intro.Phase.TITLE, Intro.Phase.ANIM, Intro.Phase.HOLD,
 			Intro.Phase.WIPE, Intro.Phase.FLASH, Intro.Phase.PLATES,
-			Intro.Phase.OVER],
+			Intro.Phase.PORT_CREDIT, Intro.Phase.OVER],
 		"every phase runs, once, in order (%s)" % [seen])
 	check(finished_at > 0, "the intro ends on its own rather than hanging")
 	# 33 s at 36 Hz. Loose bounds: this is a "did a phase collapse" check,

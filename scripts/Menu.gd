@@ -231,12 +231,86 @@ func _place(file: String, name: String) -> void:
 ## that way and came out as white blocks instead of the original's small
 ## amber pips. Anything reached from _draw_overlay must be resolved here
 ## first, outside the draw pass.
+## The hint lines painted into the retail full-screen menus, as (first row,
+## last row) in the original's 200-row space. Found by looking for bright-pixel
+## spikes in the lower third of each picture and reading the crops.
+const TOUCH_HINT_BANDS := {
+	"setmenu": [[176, 190]],                          # "Press Esc to exit menu"
+	"helpmenu": [[164, 194]],                         # ESC to exit / SPACE for next
+}
+## Columns to take replacement background from. The retail wording is centred,
+## so the left margin of the SAME ROW is always background — which beats
+## copying a band from elsewhere in the picture, because the row keeps its own
+## lighting and there is no clean band to find anyway (the first attempt tiled
+## fragments of the help text back over itself).
+const TOUCH_HINT_MARGIN := 40
+## What the port draws instead, once the retail wording is covered.
+const TOUCH_HINT_TEXT := {
+	"setmenu": ["TAP OUTSIDE TO GO BACK"],
+	"helpmenu": ["TAP TO TURN THE PAGE"],
+}
+
+
 func _tex(name: String) -> Texture2D:
-	if _tex_cache.has(name):
-		return _tex_cache[name]
+	var key := name + ("!touch" if touch_ui else "")
+	if _tex_cache.has(key):
+		return _tex_cache[key]
 	var t: Texture2D = load("res://data/gfx/%s.png" % name)
-	_tex_cache[name] = t
+	if touch_ui and t != null:
+		t = _without_key_hints(name, t)
+	_tex_cache[key] = t
 	return t
+
+
+## A phone has no Esc and no space bar, so the retail hint lines are simply
+## wrong there. They are painted into the 320x200 pictures, so they are covered
+## with background copied from a CLEAN BAND OF THE SAME PICTURE — the
+## backgrounds are mottled noise, so a copied band tiles invisibly — and the
+## port writes its own touch wording over the top in the game's 8x8 font.
+##
+## Nothing on disk is touched and no art is forked: this builds one derived
+## texture in memory, only on Android and iOS, and only for the two pictures
+## that carry the wording. The desktop build never reaches it.
+func _without_key_hints(name: String, tex: Texture2D) -> Texture2D:
+	var family := name.split("_")[0]
+	var bands: Array = TOUCH_HINT_BANDS.get(family, [])
+	if bands.is_empty():
+		return tex
+	var img := tex.get_image()
+	img.convert(Image.FORMAT_RGBA8)
+	var w := img.get_width()
+	for band in bands:
+		var y0: int = band[0]
+		var y1: int = band[1]
+		for y in range(y0, mini(y1 + 1, img.get_height())):
+			for x in w:
+				if x < TOUCH_HINT_MARGIN:
+					continue          # already background; leave it alone
+				img.set_pixel(x, y, img.get_pixel(x % TOUCH_HINT_MARGIN, y))
+	var out := ImageTexture.create_from_image(img)
+	var lines: Array = TOUCH_HINT_TEXT.get(family, [])
+	if not lines.is_empty():
+		_stamp_text(img, lines[0], int(bands[0][0]) + 3)
+		out = ImageTexture.create_from_image(img)
+	return out
+
+
+## Draw one line of 8x8 text straight into the picture, centred. Done here
+## rather than as a separate node so the replacement lives in exactly the same
+## place in the draw order as the wording it replaces.
+func _stamp_text(img: Image, text: String, y: int) -> void:
+	var x0 := int((SkyRoads.SCREEN_W - Text8x8.width(text)) / 2)
+	for i in text.length():
+		var g: Array = Text8x8.glyph_rows(text.unicode_at(i))
+		for row in g.size():
+			var bits: int = g[row]
+			for col in 8:
+				if bits & (1 << col):
+					var px := x0 + i * 8 + col
+					var py := y + row
+					if px >= 0 and px < img.get_width() \
+							and py >= 0 and py < img.get_height():
+						img.set_pixel(px, py, Color(0.83, 0.83, 0.72))
 
 
 func _show() -> void:

@@ -29,6 +29,13 @@ var _in_game := false
 var _shot_dir := ""
 var _shot_at: Array[int] = []
 var _shot_alpha := -1.0
+
+## The phone's pause menu: three tappable rows in the original's 320x200 space,
+## centred. Only ever built when the touch UI is on.
+const PAUSE_MENU_ROWS := ["RESUME", "RESTART", "QUIT"]
+const PAUSE_ROW_H := 16
+const PAUSE_MENU_TOP := 78
+var _pause_menu: Control
 var _shot_every := 0
 var _pending_shot := -1
 var _owed: Array[int] = []
@@ -100,8 +107,13 @@ func _ready() -> void:
 	_menu_shot = opt.menu_shot
 	# A parity capture must render the reference screen and nothing else, so
 	# the touch layer stays off there even on a phone.
+	# SkyRoads.is_mobile() is Android/iOS specifically, not
+	# OS.has_feature("mobile") — that is also true of a web export on a touch
+	# device, and the mobile UI changes (no CONTROLS item, a pause menu instead
+	# of the P key) are for phones. --touch still forces it on a desktop, which
+	# is how the layout is testable at all.
 	_touch_ui = opt.force_touch \
-		or (OS.has_feature("mobile") and not opt.is_parity_capture())
+		or (SkyRoads.is_mobile() and not opt.is_parity_capture())
 	# Godot quits on Android's back gesture unless told otherwise, which would
 	# end a run rather than back out of it. _notification handles it instead.
 	get_tree().set_quit_on_go_back(false)
@@ -192,6 +204,8 @@ func _teardown() -> void:
 			"help_page": _menu.help_page,
 		}
 	_paused = false
+	# a child of _hud, so it dies with it — but the reference must not dangle
+	_pause_menu = null
 	for n in [_menu, _world, _hud, _loop, _roadend, _touch]:
 		if n != null and is_instance_valid(n):
 			n.queue_free()
@@ -365,6 +379,13 @@ func _begin(index: int) -> void:
 		_touch = TouchControls.new()
 		_touch.mouse_fallback = _opt.force_touch
 		_touch.on_pause = _touch_pause
+		_pause_menu = Control.new()
+		_pause_menu.position = Vector2.ZERO
+		_pause_menu.size = Vector2(SkyRoads.SCREEN_W, SkyRoads.SQUARE_H)
+		_pause_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_pause_menu.visible = false
+		_pause_menu.draw.connect(_draw_pause_menu)
+		_hud.add_child(_pause_menu)
 		add_child(_touch)
 	_labels = CellLabels.new()
 	_hud.add_child(_labels)
@@ -552,8 +573,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 			_replaying = false
 			_fade_transition(_open_menu.bind(Menu.Screen.MAIN))
 		elif _paused:
-			_paused = false              # any input resumes (game.c:298-307)
-			_loop.paused = false
+			# the phone gets a real pause menu rather than "any tap resumes"
+			_pause_menu_tap(_touch_canvas_pos(ev as InputEventScreenTouch))
 	elif _in_game and ev is InputEventKey and ev.pressed and not ev.echo:
 		var key := (ev as InputEventKey).keycode
 		if _replaying and road_index == 0:
@@ -569,11 +590,9 @@ func _unhandled_input(ev: InputEvent) -> void:
 		if _paused:
 			# any key resumes; ESC resumes AND quits to the road select
 			# (game.c:298-307)
-			_paused = false
+			_set_paused(false)
 			if key == KEY_ESCAPE:
 				_fade_transition(_open_menu.bind(Menu.Screen.GO))
-			else:
-				_loop.paused = false
 			return
 		# The developer keys are inert while frames are being captured. Every
 		# one of them either paints over the picture being measured or stalls
@@ -592,8 +611,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 				_fade_transition(_open_menu.bind(Menu.Screen.GO))
 			KEY_P:
 				if not _replaying:   # the original cannot pause the demo
-					_paused = true
-					_loop.paused = true
+					_set_paused(true)
 			KEY_L:
 				_labels.toggle()
 				_toast("object IDs %s\nB=block T=tunnel H=empty row"
@@ -706,8 +724,7 @@ func _notification(what: int) -> void:
 			if OS.has_feature("mobile") and _in_game and not _paused \
 					and not _replaying \
 					and _loop != null and is_instance_valid(_loop):
-				_paused = true
-				_loop.paused = true
+				_set_paused(true)
 
 
 ## One screen back, wherever we are. This is Escape's job on a keyboard, so it
@@ -722,7 +739,7 @@ func _go_back() -> void:
 	elif _menu != null:
 		_menu.handle_input(_escape_event())
 	elif _in_game:
-		_paused = false
+		_set_paused(false)
 		_replaying = false
 		_fade_transition(_open_menu.bind(Menu.Screen.GO))
 
@@ -770,6 +787,67 @@ func _escape_event() -> InputEventKey:
 ## to pause, tap it again to leave the road. That is the original's own pair
 ## of behaviours (P pauses, ESC while paused quits to the road select,
 ## game.c:298-313) reached with one control instead of two keys.
+## A touch's position in the original's 320x240 canvas space. Same inverse the
+## touch layer uses; the pause menu lives in the same coordinates as everything
+## else drawn in the HUD.
+func _touch_canvas_pos(ev: InputEventScreenTouch) -> Vector2:
+	if _pause_menu == null:
+		return Vector2.ZERO
+	return _pause_menu.get_global_transform().affine_inverse() * ev.position
+
+
+## One row of the phone's pause menu, in the original's 320x200 space.
+func _pause_row_rect(i: int) -> Rect2:
+	var y := float(PAUSE_MENU_TOP + i * PAUSE_ROW_H)
+	return Rect2(Vector2(90.0, y * SkyRoads.PIXEL_ASPECT),
+		Vector2(140.0, float(PAUSE_ROW_H - 3) * SkyRoads.PIXEL_ASPECT))
+
+
+func _draw_pause_menu() -> void:
+	# a dim ground so the road behind cannot be mistaken for a live frame
+	_pause_menu.draw_rect(Rect2(Vector2.ZERO,
+		Vector2(SkyRoads.SCREEN_W, SkyRoads.SQUARE_H)), Color(0, 0, 0, 0.62), true)
+	for i in PAUSE_MENU_ROWS.size():
+		var r := _pause_row_rect(i)
+		_pause_menu.draw_rect(r, Color(0.83, 0.83, 0.72), false, 1.0)
+		var label: String = PAUSE_MENU_ROWS[i]
+		var x := int((SkyRoads.SCREEN_W - Text8x8.width(label)) / 2)
+		Text8x8.draw(_pause_menu, label, x, PAUSE_MENU_TOP + i * PAUSE_ROW_H + 4,
+			Color(0.83, 0.83, 0.72), SkyRoads.PIXEL_ASPECT)
+
+
+## Returns true when the tap was consumed by the pause menu.
+func _pause_menu_tap(p: Vector2) -> bool:
+	if _pause_menu == null or not _pause_menu.visible:
+		return false
+	for i in PAUSE_MENU_ROWS.size():
+		if not _pause_row_rect(i).has_point(p):
+			continue
+		match i:
+			0:
+				_set_paused(false)
+			1:
+				_set_paused(false)
+				_fade_transition(_begin.bind(road_index))
+			2:
+				_set_paused(false)
+				_fade_transition(_open_menu.bind(Menu.Screen.GO))
+		return true
+	# a tap anywhere else on the overlay does nothing: the three rows are the
+	# whole interface, and "any tap resumes" would make QUIT hard to hit
+	return true
+
+
+func _set_paused(on: bool) -> void:
+	_paused = on
+	if _loop != null and is_instance_valid(_loop):
+		_loop.paused = on
+	if _pause_menu != null:
+		_pause_menu.visible = on
+		if on:
+			_pause_menu.queue_redraw()
+
+
 func _touch_pause() -> void:
 	if not _in_game or _loop == null or _fading:
 		return
@@ -779,12 +857,9 @@ func _touch_pause() -> void:
 		_fade_transition(_open_menu.bind(
 			Menu.Screen.MAIN if road_index == 0 else Menu.Screen.GO))
 		return
-	if _paused:
-		_paused = false
-		_fade_transition(_open_menu.bind(Menu.Screen.GO))
-	else:
-		_paused = true
-		_loop.paused = true
+	# The button opens the menu; the menu decides what happens next. Tapping it
+	# again just closes it, which is what a pause button should do.
+	_set_paused(not _paused)
 
 
 ## A short-lived on-screen message. The recording filename is useless if the

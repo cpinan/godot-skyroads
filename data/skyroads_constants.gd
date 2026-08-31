@@ -172,6 +172,16 @@ static func tile_blocktop(code: int) -> int:
 	return (code >> 4) & TILE_SURFACE_MASK
 
 
+## True on a real phone or tablet. Deliberately narrower than
+## `OS.has_feature("mobile")`, which is also true for a web export on a
+## touch device: the mobile UI changes here — no Controls item, no keyboard
+## hints, a pause button instead of the P key — are for Android and iOS
+## specifically, and the desktop build must never take them.
+static func is_mobile() -> bool:
+	var n := OS.get_name()
+	return n == "Android" or n == "iOS"
+
+
 static func tile_geometry(code: int) -> int:
 	return (code >> 8) & TILE_SURFACE_MASK
 

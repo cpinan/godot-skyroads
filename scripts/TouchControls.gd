@@ -38,9 +38,10 @@ const JUMP_R := 27.0
 ## thumb's width of travel — far enough not to trigger on a resting thumb,
 ## near enough that steering does not feel like a lever.
 const STICK_RANGE := 27.0
-## Pause / back, top right. Small and out of the way: it is the one control
-## that must never fire by accident mid-jump.
-const PAUSE_RECT := Rect2(292, 4, 24, 20)
+## Pause, top LEFT. Small and out of the way: it is the one control that must
+## never fire by accident mid-jump, and the left corner is the farthest point
+## on the screen from the jump button at (280, 196).
+const PAUSE_RECT := Rect2(4, 4, 24, 20)
 
 ## Set by Main; called with no arguments when the pause box is tapped.
 var on_pause: Callable

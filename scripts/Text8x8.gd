@@ -45,6 +45,15 @@ static func _glyph_for(code: int) -> Array:
 	return _glyphs[code]
 
 
+## The raw 8 rows for one codepoint, for callers that need to rasterise into an
+## Image rather than a CanvasItem.
+static func glyph_rows(code: int) -> Array:
+	_ensure_loaded()
+	if _glyphs.is_empty():
+		return []
+	return _glyph_for(code)
+
+
 static func width(s: String) -> int:
 	return s.length() * GLYPH_W
 
