@@ -1446,3 +1446,43 @@ matched on shape and constants, not traced one by one to their `_ap_lands`
 calls. The structure, the constants and the three-way differential all agree,
 so nothing suggests a defect — but this is a spot check, not the branch-for-
 branch treatment `fn_1685` got in 12.6, and it should not be quoted as one.
+
+### 12.10 — the gameplay song could repeat, and the original never does
+
+Found while auditing audio. Both the port and the C reference dodge an
+immediate song repeat by comparing the new pick against `want_song`:
+
+```c
+int song = 2 + (int)((g->rng >> 16) % 12);
+if (song == g->want_song)          /* <- wrong operand */
+    song = 2 + (song - 1) % 12;
+```
+
+`want_song` is also what the menus set — 0 for the intro, 1 for both menu
+screens. On the normal path (road, back to the road select, next road) it is 1
+when the road starts, a gameplay song is never 1, and **the dodge never
+fires**. The port could play the same song twice running.
+
+`main` at `0x29f-0x2c9` keeps the previous game index in its own slot at
+`[bp-6]`, which no menu touches:
+
+```
+0x29f   r = rand() % 12
+0x2ab   cmp di, [bp-6]         ; the previous GAME index
+0x2b2   r = (r + 1) % 12       ; a step, not a reroll
+0x2c0   [bp-6] = r
+0x2c5   music_start(r + 2)
+```
+
+Fixed on both sides — `AudioMgr._last_game_song` and `sr_game.last_game_song`.
+The arithmetic was already right: `2 + ((song - 1) % 12)` is exactly
+`(di + 1) % 12` re-based, including at the wrap. Only the operand was wrong.
+
+**The fixture did not need regenerating**, which is worth stating because §11
+had to correct three of them. `test_audio.gd` drives `gameplay_song()` in a
+row with no menu between calls, so the last song asked for and the last
+gameplay song are the same value at every step and both versions emit the
+identical sequence. This one only shows in play.
+
+Thirteenth defect found by reading the binary, and the first outside the
+renderer and the shell.

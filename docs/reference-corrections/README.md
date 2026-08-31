@@ -102,6 +102,36 @@ Three shapes, from the furthest row each reaches — 12 at 161/164 and 28 at
 overfly the finish, which only triggers inside the final tunnel mouth; 10, 13
 and 16 die below row 10 and neither key moves them.
 
+### `0003-song-no-repeat.patch`
+
+Applies to `skyroads-port/`.
+
+Gameplay music picks a random song 2..13 and dodges an immediate repeat. Both
+the reference and the port compared the new pick against `want_song` — but
+`enter_state` sets `want_song` to 0 for the intro and 1 for the menus, so by
+the time a road starts on the normal `road -> menu -> road` path it is 1, a
+gameplay song is never 1, and **the dodge can never fire**.
+
+`main` at `0x29f-0x2c9` does not do that. It keeps the previous game index in
+its own slot at `[bp-6]`, which the menus never touch:
+
+```
+r  = rand() % 12
+if r == prev:  r = (r + 1) % 12      ; not a reroll — a step
+prev = r
+music_start(r + 2)
+```
+
+So the original never plays the same gameplay song twice running, and the port
+did. Fixed on both sides; the arithmetic was already right, only the operand
+was wrong.
+
+`tests/fixtures/song_sequence.txt` is unaffected and did NOT need regenerating:
+`test_audio.gd` drives `gameplay_song()` repeatedly with no menu in between, so
+the last song asked for and the last gameplay song are the same value
+throughout, and both versions produce the identical sequence. The bug only
+shows in real play.
+
 ## Adding to this directory
 
 Keep one patch per defect, named `NNNN-<what>.patch`, and cite the EXE address

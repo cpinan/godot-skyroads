@@ -31,6 +31,8 @@ var _music_player: AudioStreamPlayer
 var _voice_player: AudioStreamPlayer
 var _sfx: Array = []
 var _song := -1                 ## the current want_song, -1 = none
+var _last_game_song := -1       ## the last GAMEPLAY song; menus do not
+                                ## disturb it, which is the point
 var _loop_begin := {}           ## song index -> loop start in seconds
 var _rng := 0                   ## game.c's song LCG
 var _warn_on := false
@@ -114,8 +116,15 @@ func want_song(n: int) -> void:
 func choose_song(entry: int) -> int:
 	_rng = int((_rng * 1103515245 + 12345 + entry) & 0xFFFFFFFF)
 	var song := 2 + ((_rng >> 16) % 12)
-	if song == _song:
+	# Dodge the previous GAMEPLAY song, not the previous song asked for. main
+	# @0x2a8 keeps the last game index in its own slot and compares `di` to
+	# that; the menus never touch it. Comparing against _song instead — which
+	# want_song(0) and want_song(1) overwrite — means the dodge cannot fire on
+	# the normal road -> menu -> road path, because _song is 1 by then and a
+	# gameplay song is never 1. The original never repeats; this did.
+	if song == _last_game_song:
 		song = 2 + ((song - 1) % 12)
+	_last_game_song = song
 	return song
 
 
