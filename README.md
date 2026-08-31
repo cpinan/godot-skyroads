@@ -254,13 +254,19 @@ scripts/          the shell, the renderer, the simulation
   model/          pure logic, no scene tree: MenuModel, HudModel, PlayerInput
   app/            LaunchOptions (the command line)
 data/             derived assets + the recovered camera and tables
-  branding/       app icons, built from the game's own art by tools/make_icons.py
+  branding/       app icons, generated from the game's own art
 tests/            suites, fixtures, and golden frames from the reference
 docs/parity/      before/after evidence for each fidelity fix
 ```
 
 `scripts/SkyRoadsPlay.gd` is the simulation and is proven bit-exact — it is
 not edited without a failing three-way trace to justify it.
+
+The analysis toolkit that produced everything under `data/` — the exporters,
+the route solver, the disassembly and the C reference the port is measured
+against — lives outside this repository, alongside it. `docs/BUGS.md` cites it
+throughout; the paths it names are relative to that wider tree, not to this
+one.
 
 ---
 
