@@ -1,8 +1,8 @@
 {
  "format": "3 bytes per tick: steer+1, accel+1, jump",
  "note": "A route is a proof the road is completable. Its absence is a search failure, not a proof of impossibility.",
- "solver": "analysis/sra.py solve --beam 64 --max-ticks 8000; the roads that failed there were retried at --beam 256 --hold 2 --max-ticks 12000",
- "solved": 15,
+ "solver": "analysis/sra.py solve --beam 64 --max-ticks 8000; the roads that failed there were retried at --beam 256 --hold 2 --max-ticks 12000; road 4 fell to --beam 1024 --hold 1 --max-ticks 16000 on 2026-08-31, where --beam 256 --hold 2 had left it at row 50/94. The other fourteen still fail at that width",
+ "solved": 16,
  "total": 30,
  "routes": [
   {
@@ -34,12 +34,12 @@
   },
   {
    "road": 4,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 50.0,
+   "solved": true,
+   "ticks": 922,
+   "seconds": 25.61,
+   "furthest_row": 94.0,
    "rows": 94,
-   "note": "every branch died"
+   "note": "completed in 922 ticks"
   },
   {
    "road": 5,
