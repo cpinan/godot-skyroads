@@ -321,25 +321,38 @@ Relevant because a reviewer will otherwise trust them.
 | `renderer.md` §9.4/§13 | `end_state` only ever 0/1/2, so the empty-tank lamps are dead | `play.c` assigns 3/4/5; `gameloop.md` §5.19 cites the writes |
 | `renderer.md` §2.3/§13 | ship frames 14..74, 75/76 unused | 7 tilts × 3 pitches × 3 flames = 63, so 14..76 |
 | `renderer.md` §4.4 | column extents (used for lateral scale) | measured at the row band's far edge — see §2.3 |
+| `gameloop.md` §13 | `fn_1067` divisors ds:0x308 `{1000,100,10,1}` | **ascending** `{1,10,100,1000,10000,0x8000}` — read out of the EXE's data segment (paragraph 0x66E). si=0 is the ONES digit, drawn rightmost. The C reference has this right; the note does not. Found closing #41. |
 
 ---
 
 ## 4. MISSING — not implemented
 
+Rewritten 2026-08-30: STAGE Z closed most of what this table used to list.
+What is left is one solver failure and four modelling approximations, each of
+which is a known simplification rather than an oversight.
+
 | | notes |
 |---|---|
-| **All audio** | 5 SFX + 14 OPL2 songs exported, none wired. Includes the empty-tank warning beep (sfx 3), which is the only unreachable sound in the C port too |
-| **Intro / ANIM sequence** | 221 delta frames exported, never played |
-| **Same-row post-ship occlusion** | `renderer.md` §4.3 directory rows 11/12; empty at most scroll phases |
-| **Tunnel arch art** | extruded from the collision profile with the correct 68..73 gradient, but not the baked span art |
-| **Settings screen persistence** | draws correct state; control-scheme choice does not actually change input handling |
-| **Road 30 route** | the beam solver cannot finish the real road 30 (200 rows of stepping stones, 2-row gaps, 1-row runways). Covered by a deterministic probe trace instead |
+| **Routes for 15 of 30 roads** | #26. The beam solver finishes 15 (1, 2, 3, 5, 7, 9, 11, 14, 15, 17, 21, 22, 23, 24, 26); the rest, including road 30's 200 rows of stepping stones, defeat it at `--beam 256 --hold 2`. Compute, not code. Unsolved roads are still covered field-by-field by the suites and by a deterministic probe trace |
+| **Split-top tunnel records** | #5. The top face of a bored block stays one quad; the original emits it in halves |
+| **Block centre-column colour** | #2/#3. A per-cell colour cannot split mid-column, so the centre column takes the left half's colour |
+| **Arch quarter-band shading** | #31 residue. The four bands are area-matched to the decoded records rather than derived, so the vault reads a shade cooler than the reference's |
+| **Shadow palette masking** | #25. The original darkens only palette 1..15 and 0x3D; the port approximates that with a stencil multiply |
+
+Deliberate deviations from the original, as opposed to gaps — there are three,
+and all three are here so nobody has to find them by reading diffs:
+
+| | why |
+|---|---|
+| **Absent joystick falls back to the keyboard** | #12. The original leaves the player unable to steer. `PlayerInput.effective_device` |
+| **Readable GRAV-O-METER** | #41. The retail game paints the hundreds digit tan on tan; the port extends the black window under it. Off for every parity capture |
+| **Touch controls, and the settings screen's hidden control row** | §10. New; the original has no touch device. Off unless the build is mobile or `--touch` is passed |
 
 ---
 
 ## 5. Test coverage, and where it is weak
 
-`godot/verify.sh` — 117 checks, 7 suites, currently green:
+`godot/verify.sh` — 478 checks in 16 suites plus a parse pass and an end-to-end replay of every road that has a winning route, currently green:
 
 | suite | what it covers |
 |---|---|
@@ -348,15 +361,28 @@ Relevant because a reviewer will otherwise trust them.
 | `test_data` | level shape, tile helpers, camera credibility |
 | `test_geometry` | drawn road vs collision cell-for-cell; lane width 46 px; block heights |
 | `test_hud` | gauge arithmetic incl. the hidden autopilot delta |
-| `test_input` | full key truth table; actions have keys bound |
+| `test_input` | full key truth table; actions have keys bound; the touch device override |
+| `test_touch` | the on-screen stick's geometry: screen halves, floating origin, two thumbs at once |
+| `test_intro` | the intro's phases, durations, palette pairs and where it hands off |
+| `touch_shell` | windowed; a synthetic tap through the real input pipeline into the real Main.tscn |
 | `test_physics` | 23-field golden traces vs the reference model |
 | `test_timing` | same elapsed time at 15/30/60/144 fps |
-| end-to-end | replays a solved route through the real scene |
+| `test_menu` | MenuModel diffed against the C engine's own menu traces, plus the phone-only settings clamp |
+| `test_audio`, `test_launch_options` | the audio wiring table; every command-line flag including the malformed ones |
+| `render_dashboard` | the dashboard band vs C reference frames; JUMP-O-MASTER swap; GRAV-O-METER window (#41) |
+| `render_menu` | every menu screen vs the C engine, plus touch navigation and the dimmed control row |
+| `render_backdrop` | the backdrop renders its own source art exactly (#30a) |
+| end-to-end | replays every solved route through the real scene |
 
 **Known weaknesses:**
 
-- Almost nothing asserts on **pixels**. `test_occlusion` is the only rendering
-  test, and rendering is where every recent bug has been.
+- Pixel coverage is no longer "almost nothing" — `render_dashboard`,
+  `render_menu`, `render_backdrop` and `test_occlusion` all assert on pixels —
+  but it is still thin where it matters most: there is no golden for the ROAD
+  itself, only for the bands around it. Road parity is measured by hand
+  against `tools/replay_frames.c` output and then written down, which means a
+  regression in the road surface is caught by a person noticing, not by
+  `verify.sh`.
 - Golden traces replay routes that **succeed**, so they never exercise a
   crash, a fall or an empty tank. The three-way differential covers those, but
   it is opt-in (`THREEWAY=1`).
@@ -364,6 +390,18 @@ Relevant because a reviewer will otherwise trust them.
   If `play.c` diverges from DOS, the whole stack reproduces it faithfully.
   `DEMO.REC` is the one real check and it passes: 1775 ticks, matching the
   figure `gameloop.md` records from instrumented-original telemetry.
+  Closing #41 showed how to attack this without DOSBox when a specific
+  question needs answering: disassemble the routine out of the retail EXE
+  (`capstone`, MZ header gives the code offset) and decode the retail asset
+  it draws into (`skyroads-port/tools/lzs.py`). That settled a two-way
+  disagreement in an afternoon and found an error in the RE notes on the way
+  (§3, the divisor table). It is not a substitute for a running original, but
+  it is a much cheaper first move than one.
+- **Nothing drives the touch layer end to end.** `render_menu` covers the
+  taps that navigate the menus and `test_input` covers the mapping, but the
+  in-game thumbstick has never been dragged by a real finger, and neither has
+  the pause box. Same standing as the joystick and mouse devices (§8.2 #12):
+  implemented, unit-tested, never held.
 
 ---
 
@@ -449,7 +487,7 @@ re-checked. Baseline: `tools/verify.sh` all 117 checks green before and after.
 > | 24 | **FIXED 2026-08-30 (STAGE Z1)** — this was never a "tier": the tile's colour nibble patches the block's TOP face, not its front. Decoding the records settles it (`tools/dump_bands.c kindlines`): at dr7 ci1 kind 2's first record spans y[64,81], the band ABOVE the deck strip, and kind 3's spans y[82,101], the deck strip itself — and `blockcolor()` patches kind 2. render.c's own comments name the two the other way round. The port painted them swapped, which made every block read inside-out and put the patched colour on the lower band. Evidence: `docs/parity/z2_block_faces.png` (synthetic road, nibble A over floor 3 — reference and port now agree face for face). The 0.08 lip remains the one accepted non-authentic touch. |
 > | 25 | **FIXED, T20** — shadow skipped when either support probe lands on a block top; priority under the ship so the MUL never darkens it. Per-pixel palette masking (only colours 1..15/0x3D darken) is still approximated by the stencil multiply. |
 > | 26 | OPEN — routes are compute, not code. |
-> | 41 | **OPEN, user-reported 2026-08-30 ("the gravity in the player HUD does not show anything, just 0 and something else").** Confirmed, with the mechanism. The VALUE is right: `HudModel.gravity_value(8)` is 500 and `gravity_digits` returns [0,0,5], so three digits are drawn. The problem is contrast. `draw_digit` paints stencil value 1 in palette 0x61 and value 2 in 0x62 — and **palette 97 (0x61) is (207,174,121), exactly the tan of the GRAV-O-METER panel**. The glyph is therefore formed by the UNPAINTED cells letting the dashboard art's black readout window show through, which only works where that window exists. Decoded from the art: the window covers the two RIGHTMOST digit slots (screen x 106-114). The hundreds digit sits at x 101-104, on plain panel, so it paints tan-on-tan and is invisible — you see "00" and nothing else, which is exactly what was reported. Note the port matches the C reference here at **0 differing pixels**, so either the reference has this wrong or the DOS original genuinely does; that is unresolved and needs a comparison against the real game under DOSBox. Prime suspects, in order: the digit colour indices (0x61/0x62 may be misread), `GRAVITY_POS` x (96 = 0x60), and the (g-3)*100 formula producing three digits for a two-digit window. |
+> | 41 | **CLOSED 2026-08-30 — AUTHENTIC, and worked around anyway. No DOSBox run was needed: the retail `SKYROADS.EXE` and the retail `DASHBRD.LZS` settle it between them.** Disassembling the binary (`capstone`, code segment at file offset 512): `fn_2b21 @0x2ba7` pushes 4, `([0x456e]-3)*100`, `0x9c`, `0x60` and calls `fn_1067`; `fn_1067 @0x1091-0x10cd` takes digit si as `(value / ds:0x308[si]) % 10` with the divisor table **ascending** `{1,10,100,1000,10000,0x8000}` and draws it at `x + (ndigits-1-si)*5`, i.e. slots 96/101/106/111; it stops at `0x1080` once the remaining value is 0 and si>0. `fn_0fc6 @0xfd6` sets the two stencil colours to **0x61 and 0x62** in VGA mode. Every one of those matches `hud.c` and matches the port. Then decoding `DASHBRD.LZS` directly (`skyroads-port/tools/lzs.py`) shows the readout window — the palette-index-0 pixels the dashboard stamp leaves black — covers **exactly the two rightmost slots, x 106..109 and 111..114**, with the digit-0 stencil already painted into them; slots 96 and 101 are plain panel, and the panel is palette 0x61, the same index `draw_digit` paints strokes in. So a digit left of x=106 is tan on tan in the 1993 game too, and since `(g-3)*100` always ends in "00" the visible half of the GRAV-O-METER reads "00" on every road ever shipped. It is Bluemoon's bug, not the port's. **Kept reproducible and worked around:** `Dashboard.authentic_gravity_window` (default false) extends the art's own black window under the slots it does not cover, so gravity 8 now reads 500; `Main` sets it true whenever `LaunchOptions.is_parity_capture()`, so every measured frame is still the authentic one. This is the only deliberate deviation in the dashboard. Tripwire: `render_dashboard.gd` `_gravity_readout`, which asserts 0 dark pixels in the hundreds cell authentic and >=6 readable. |
 > | 42 | **NOT A DEFECT — resolved 2026-08-30, user-reported twice ("jump-o-master does not show anything", then "appears IDLE even when running or jumping").** The panel is not a lamp, it is a WORD, and the port swaps it correctly: decoding the two 26x5 stencils shows state 0 spells **IDLE** and state 1 spells **IN USE**, and rendering the dashboard in both states changes 194 pixels. What the report actually exposes is a naming mismatch, not a bug: JUMP-O-MASTER is the LANDING-ASSIST indicator, not a jump indicator. It reads IN USE only while the assist is actively correcting the ship's speed to make a landing — 28 of road 1's 462 ticks, about 6%, and never for long — so a player jumping normally will almost always see IDLE. Pinned by `render_dashboard.gd`, which asserts the two states differ, so if the swap ever breaks it fails loudly instead of silently showing one word forever. Still worth confirming against the real DOS binary that the assist engages as rarely there. |
 > | 40 | **DONE 2026-08-30 (user decision at STAGE Z7)** — the music was shipping as 125 MB of 44.1 kHz mono wav, in a 283 MB tree. Re-encoded to Ogg Vorbis q4: **17 MB, 7.4x smaller, 108 MB saved**, every file verified to decode to the same duration at 85-107 kbps. 44.1 kHz was kept deliberately — only 1.9% of the OPL renders' energy sits above 11 kHz, but it is real (the rhythm channels), and this is a port that measures things rather than assuming them inaudible. `AudioStreamOggVorbis` loops itself from `loop_offset`, so `AudioMgr._on_song_finished` and its end-of-stream seam are gone; `music_meta.json` still supplies the loop point. Verified still audible after the change: CoreAudio, master bus -3.2 dB. |
 > | 27 | orphan `dbg_*.gd.uid` deleted (T21). The listed dead data files remain on disk, deliberately unwired; delete freely if the repo needs the space. |
@@ -457,7 +495,7 @@ re-checked. Baseline: `tools/verify.sh` all 117 checks green before and after.
 > | 29 | **CLOSED 2026-08-30 (STAGE Z3) — the premise was wrong, and the symptom is fixed.** There is no per-row or near-field darkening anywhere in the DOS renderer. Proven directly: drive the C engine over a synthetic road whose every tile is the same code (0x0003) and read the palette index down the middle of the screen — it is index 3 at every distance from the horizon to the deck line, with no remap. Nothing in render.c or tables.c applies one either; `fill_record` resolves a colour through `sr_quad[k][half]` and half is the screen SIDE, not the depth. What the evidence composite actually showed was the block top/front colour swap (#24): road 26's near geometry is a big block, and the port was painting its front with the top's colour. Fixed in STAGE Z2; road 26's shading now tracks the reference at every sampled tick. Evidence `docs/parity/z3_road26_before_after.png`. |
 > | 29b | OPEN, small, found while closing #29: road 26 still differs on ~17% of its solid road pixels, and the confusion is dominated by C index 3 -> port index 1 — two dark greys ONE PALETTE STEP APART, i.e. the port painting an adjacent ROW's colour. Road 26 is the one level that makes this visible, because its consecutive rows are a colour ramp (rows 31-40 run 15,15,3 / 15,3,4 / 15,4,5 / …), so a sub-tick difference in presented depth repaints whole bands from the neighbouring row. It is the residue of comparing an interpolating renderer against a tick-exact one, not a drawing fault. **Three fixes were tried and all measured WORSE — do not repeat them:** presenting the capture at alpha=0 (road 2: 6.5% -> 8.0%), stopping the catch-up loop on the scheduled tick so the shot is of that tick rather than tick N+k (-> 8.5%), and both together. The reference's frame for a tick corresponds to a moment this engine reaches PART-WAY through its own, so the interpolated, end-of-frame state is the closer match. Recorded in `Main._capture_pending`. |
 > | 29c | OPEN, small, found while closing #29: on a tun_high cell (geometry nibble 5) the masonry tier's front stops flat at half-block height while the reference's runs down onto the arch, leaving a sliver of the vault's outer surface showing — measured on an isolated tile as the tier ending 5 screen rows early at the bore's centre. Recipe: a synthetic road of 0x0003 with 0x053f at rows 20-23 column 3, driven with a held-accelerate route, compared at t=170/178. A per-slice fix bounding the tier front by ARCH_OUTER_PX closed it on the isolated tile but REGRESSED road 2 (t=640: 9.9% -> 16.7%), so it was reverted; the tier's true lower bound is not ARCH_OUTER_PX and has not been derived. |
-> | 29-old | OPEN, cosmetic, found during #28's parity sweep: road 26's nearest rows render much darker in the C reference than in the port (some per-row/near-field darkening the port does not model). Alignment is correct; colour only. See `scratchpad parity out_road26_t0240` composite. |
+> | 29-old | **CLOSED 2026-08-30 — same premise as #29, disproven by the same measurement.** This entry and #29 are one claim: that the C reference darkens near rows and the port does not. #29's direct test settled it — driving the C engine over a synthetic road of one tile code and reading the palette index down the middle of the screen gives index 3 at every distance, horizon to deck line, with no remap anywhere in `render.c` or `tables.c`. There is no near-field darkening to model, on road 26 or anywhere else. The darkness the composite showed was the block top/front colour swap (#24), fixed in STAGE Z2. Nothing to do; kept for the audit trail because "two entries, one wrong premise" is a shape that recurs. |
 > | 34 | **FIXED 2026-08-30 (user report: "UI bugs in the player speed and UI")** — one root cause behind four symptoms. The DOS screen is a single opaque framebuffer: the world picture fills rows 0..137, the dashboard is STAMPED over rows 129..199 skipping its index-0 pixels, and the road is composed into rows 32..137 ONLY, so every transparent dashboard pixel below row 137 shows palette index 0, i.e. black. In the port the 3D viewport covers the whole window, so the live road bled through the dashboard art's transparent pixels — through the GRAV-O-METER digits, the JUMP-O-MASTER panel, the unlit side of the SPEEDOMETER and the bottom corners — and changed hue as the player drove between worlds. Fixed with an opaque black band behind the dashboard from row 138 down. Dashboard parity vs the C engine on the user's road-2 recording went from ~800 differing pixels per frame to **0 across every frame sampled**. This subsumes #30b, which was recorded as "corner speckle" but was the whole band. Tripwire: `tests/render_dashboard.gd` compares the band against C reference frames. |
 > | 35 | **FIXED 2026-08-30 (user report: "also in game menu")** — same family. Every DOS menu begins with `sr_fb_clear(fb, 0)`, so index 0 is BLACK; the exports carry it as alpha 0 (INTRO.LZS alone has 15109 such pixels) and Godot's own grey clear colour showed through, mottling the main menu's night sky. Fixed with an opaque black ground behind every menu screen. |
 > | 36 | **FIXED 2026-08-30** — the road-select completion pips drew as solid WHITE blocks instead of the original's small amber marks. Not a palette or export fault: `Menu._draw_overlay` called `load()` on the pip texture from INSIDE a `draw` handler, and a texture first loaded there renders as a plain white rectangle. Reproduced in isolation (the same texture preloaded draws correctly). Fixed by caching textures outside the draw pass. Road-select now matches the C engine **pixel for pixel**. |
@@ -604,6 +642,30 @@ demo attract wiring (10 s idle, z/0x666 indexing) exact; ship frame math
 edge-support and neighbour-lane probes authentic (§1.1 #3/#4). The renderer.md
 errors listed in §3 were correctly NOT propagated into the port.
 
+> **RETRACTED 2026-08-30 — one claim in this section was wrong.** It used to
+> read "the settings screen shows no current-state feedback at all, which is
+> the original's own behaviour, not an omission here", sourced from
+> `game.c:257-260` blitting exactly one overlay. The retail EXE does not agree:
+> `fn_4ae2 @0x4ae2` loops all five items and calls `fn_4aaf(i + 5, mode)` with
+> mode **1** when `i == [0x4526]` (the cfg's control device) or
+> `i == [0x4528] + 3` (the cfg's sound flag), and **0xff** otherwise —
+> and `fn_41e5`'s threshold blit (`0x41cb`: `p < 0x63` transparent,
+> `0x63 <= p < threshold` erased back to the base picture, `p >= threshold`
+> drawn) means mode 1 DRAWS an overlay and mode 0xff ERASES it. Overlays 5..9
+> are the ORANGE set. So the original marks the active control device and the
+> active sound setting in orange, permanently, and the white set 0..4 is the
+> moving cursor on top of that. The C reference never implemented it, the
+> goldens come from the C reference, and the port therefore passes a pixel
+> test against a screen that is missing a feature. See §11.
+>
+> **RETRACTED 2026-08-30 (second pass) — "demo attract wiring (10 s idle …)
+> exact" is wrong about the trigger.** The `z/0x666` indexing is right; the
+> ten-second idle is not. The retail menus read keys with fn_5fad, a
+> **blocking** `int 21h ah=7` (@0x5fad), so no menu can time out. The attract
+> demo is reached from the INTRO: fn_4575 returns its abort flag (@0x4aa5),
+> and main @0x0221 answers a zero — nobody touched anything — with
+> `[0x9602] = 3` and road 0. See §11.11.
+
 ### 8.4 Audio wiring table (trigger → id → where)
 
 Producer already in place: `SkyRoadsPlay.gd:299-305` sets `pending_sfx = id+1`
@@ -748,3 +810,159 @@ or wire, and remove orphan dbg uid files).
 - Fades must not run in any automated path or the screenshot/replay suites
   hang or slow 2 s per transition.
 - Never copy retail `.LZS`/`.SND` into the repo; derived exports only.
+
+---
+
+## 10. 2026-08-30 — mobile
+
+New work, not a defect fix. The original has no touch device, so nothing here
+is recovered from the EXE; what follows is the reasoning, so the next person
+does not have to guess which parts were choices.
+
+### What was added
+
+| | where |
+|---|---|
+| Thumbstick + jump button + pause box | `scripts/TouchControls.gd` |
+| `PlayerInput.Device.TOUCH` | `scripts/model/PlayerInput.gd` |
+| Tap navigation on every menu screen | `scripts/Menu.gd` `_keys_for_tap` |
+| Settings control row dimmed and unreachable | `MenuModel.touch_ui`, `settings_first_item()` |
+| Android + iOS export presets | `export_presets.cfg` |
+| Icons built from the game's own art | `tools/make_icons.py` → `data/branding/` |
+| Landscape-either-way, GL Compatibility on mobile | `project.godot` |
+| MIT for the code, with the derived assets carved out | `LICENSE` |
+
+### Decisions worth knowing about
+
+- **The simulation never learns a finger was involved.** `TouchControls.sample`
+  returns `PlayerInput.from_axes(...)`, the same call the joystick and mouse
+  devices make, so the three-way differential against the C engine is
+  untouched by any of this.
+- **`Device.TOUCH` is never persisted.** `skyroads.cfg` is the DOS save format
+  and a 3 in its control word would not be a SkyRoads save. The platform picks
+  TOUCH at runtime; the cfg keeps whatever 0..2 it had.
+- **The hit areas are the screen halves, not the drawn circles.** The circles
+  are a hint. A control you have to hit is a control you fight, and the stick's
+  origin follows the thumb that starts it for the same reason.
+- **The road list needs two taps.** Tap selects, a second tap on the same road
+  starts it. Thirty 48x9 cells and an instant launch is a bad pairing.
+- **Menu hit regions come from `gfx.json`**, i.e. from the original's own
+  overlay picts, so they cannot drift away from the art. This also means a
+  wrong lookup fails silently as "the menu ignores taps" — hence the tests in
+  `render_menu.gd`.
+- **`stretch/aspect` stays `keep`.** "expand" would show more world than DOS
+  did and quietly invalidate every parity measurement in this file, on the one
+  platform nobody is measuring.
+- **`renderer/rendering_method.mobile="gl_compatibility"`.** Without the
+  override Godot puts mobile on a different renderer than every measurement
+  here was taken on.
+
+### A trap found while doing it
+
+Every texture `.import` in `data/` carried `detect_3d/compress_to=1`: on a
+reimport, Godot may decide a texture is used in 3D and rewrite it to VRAM
+compression. The ship and the road **are** 3D. A VRAM-compressed ship sprite
+would break every pixel-parity number in this document without touching a line
+of code, and enabling ETC2/ASTC for the Android export is exactly what makes
+that compression available. All 374 of them are now pinned to
+`detect_3d/compress_to=0`. If a new asset is exported, check that it lands the
+same way.
+
+### Not done
+
+- **Never held.** The touch layer has never run on a phone. `--touch` drives it
+  with the mouse on a desktop, which proves the wiring, not the ergonomics.
+- **No signing.** The Android keystore and the iOS team id are deliberately
+  absent from `export_presets.cfg`.
+- **The package name `com.cpinan.skyroads` is a placeholder** and the app is
+  named SkyRoads, which is Bluemoon's. Publishing under either is a decision
+  nobody has made — see `LICENSE`, and note the repository is private on
+  purpose.
+
+---
+
+## 11. 2026-08-30 — the port vs the retail EXE, not vs the C reference
+
+Everything above this section was measured against `skyroads-port/`. This
+section is the first pass measured against **`SKYROADS.EXE` itself**, decoded
+with capstone (MZ header paragraph count x 16 is the code offset; the RE notes'
+addresses are code-segment relative, data segment is paragraph 0x66E) and
+against the retail `.LZS` files decoded with `skyroads-port/tools/lzs.py`.
+
+Seven defects. **All seven were also present in the C reference**, which is why
+no existing test could see them and why two of them were written down in this
+document as "authentic". Every one is fixed.
+
+| # | what the original does | what the port did |
+|---|---|---|
+| 11.1 | **Main menu carries the SkyRoads logo.** fn_4e36 @0x4f06 blits INTRO.LZS pict 1 (320x54 at y=32) over the title before any item box | drew the title and the boxes and nothing between them — the menu had no game name on it |
+| 11.2 | **Settings screen marks the current setting.** fn_4ae2 @0x4ae2 walks all five items and calls fn_4aaf(i+5, mode) with mode 1 where `i` is the cfg's control device or its sound flag + 3, 0xff elsewhere; objects 5..9 are the ORANGE overlays | showed the white cursor only. §8.3 asserted this was authentic. It is not — **retracted there** |
+| 11.3 | **The intro runs for another 23 s after the animation**: a 319-column two-way curtain wipes in the logo (@0x484a-0x48e3), it flashes white and settles (@0x4938-0x4950), then five credit plates fade in/hold/out at 50 ticks each (@0x49de-0x4a16). Plus a 36-tick fade-in on the title (@0x4749) | stopped at the end of the ANIM. `intro_1` and `intro_4..8` were exported and referenced by nothing |
+| 11.4 | **Both menus play song 1.** fn_4e36 @0x4e3f and fn_5164 @0x5172 both `music_start(1)`; song 0 is the intro's alone (fn_4575 @0x4586) | played song 0 on the main menu, so the intro track ran over the menu and song 1 was only ever heard on the road select |
+| 11.5 | **Help is two pages, each faded.** fn_4e12 @0x4e21 calls fn_4dac once, then again only if the key was not ESC; fn_4dac fades in 36 (@0x4dd8) and out 36 (@0x4ded) around its wait | paged through three screens with instant flips. `helpmenu_2` is art the 1993 game never shows |
+| 11.6 | **"Road Completed" holds 27 ticks and moves on.** fn_2b21 @0x2c90 is `fn_443d(0x1b)`, a frame count with no key test — its abort flag was disarmed at 0x4a6f when the intro ended | waited for a keypress the original never asks for |
+| 11.7 | **A key skips the intro's fades.** fn_4315 jumps to t=100 on `[0x54ac]`, set by fn_4137 on any key while armed by `[0xaf42]` — raised at 0x470d for the intro, cleared at 0x4a6f | froze input for the whole fade, so mashing a key through the intro did nothing |
+
+### How the fades are reproduced without a palette
+
+fn_4315 interpolates the DAC between two palettes of the same picture, and
+`lerp(A[v], B[v], t)` per pixel is exactly "draw the A render, then the B
+render over it at alpha t". So each cross-faded picture ships as two PNGs and
+the fade is a `modulate`. `tools/export_intro_palettes.py` writes the A
+renders and, as its own cross-check, re-renders B and compares it against the
+already-shipped `intro_N.png` — all six match byte for byte, which is what
+makes the pairing trustworthy. `test_intro.gd` asserts that flag stays true.
+
+### Consequences for the test suite
+
+- **The `menu_settings_*` goldens are C-engine frames and were missing 11.2.**
+  Rather than compare against a reference known to be wrong, `render_menu.gd`
+  now composites the retail orange picts onto the golden at their own PICT
+  offsets before diffing — retail pixels, not the port's own output, so the
+  test still measures against the original. Both settings screens are back to
+  **0.000% differing**.
+- **`menu_traces.txt`'s `help-pages-wrap` script came from the C engine and
+  had three pages.** Corrected in place, with a `#` note in the fixture:
+  regenerating that file from `tools/menu_trace.c` will silently reintroduce
+  11.5.
+- `menu_help_2` is still rendered and compared. It is unreachable in the game
+  now, and the check is kept deliberately: it exercises the art pipeline on a
+  screen nothing else covers.
+
+### 11.8-11.11 — a second pass, over the road select and the attract loop
+
+| # | the original | the port |
+|---|---|---|
+| 11.8 | **LEFT from the first column goes to road 1.** fn_5164 @0x52cb: `if sel >= 15 then sel -= 15 else sel = 0` | refused to move, from game.c's `if (LEFT && go_sel >= 15)` |
+| 11.9 | **RIGHT from the second column goes to road 30.** @0x52e6 is an unconditional `sel += 15`, and the loop top @0x527f clamps `sel >= 30` to 29 | refused to move |
+| 11.10 | **Only Enter confirms.** Every menu dispatches on the BIOS scancode and tests 0x0D, 0x1B and the four arrows — main @0x5037, road select @0x531b, settings @0x4d6c. The help screen is the exception: fn_4dac @0x4dfa tests only for ESC, so **any other key turns the page** | accepted space as confirm everywhere, and paged help on Enter alone |
+| 11.11 | **The attract demo comes off the end of the INTRO, and the menus have no clock at all.** fn_5fad @0x5fad is a blocking `int 21h ah=7`. fn_4575 returns its abort flag (@0x4aa5): zero means untouched, and main @0x0229 answers with `[0x9602] = 3` and road 0. When that demo ends naturally main @0x0385 jumps back to the `fn_4575()` call — intro, demo, intro, demo. Only ESC (play-loop result 7, @0x037a) breaks out to the menu | started the demo after ten idle seconds on the main menu, ended it back at the menu, and exited it on any key |
+
+11.11 also answers a question `docs/STATUS.md` had been carrying since STAGE
+Z: **yes, the intro replays** — on the attract loop, and only there. Returning
+to the menu never replays it, which is what the port already did.
+
+### Consequences for the fixtures, again
+
+`menu_traces.txt`'s `go-nav-and-launch` rows 6-10 were C-engine output and
+encoded the guarded left/right of 11.8-11.9. Corrected in place with a `#`
+note, the same treatment the help rows got. `test_menu.gd`'s attract test is
+now its own inverse — it asserts that a minute of idling on any screen changes
+nothing at all, because the failure to guard against is that timer coming
+back.
+
+### A cheap trap in the harness, not the game
+
+`touch_shell.gd` waited out the shell's fades by counting FRAMES. This
+harness renders as fast as it can — measured at about 1400 fps — so 900
+frames is 0.6 s of a 2 s fade, and the suite failed on a transition that was
+working perfectly. It waits on the wall clock now. Anything that waits for a
+fade must.
+
+### A trap that cost a save file
+
+`render_menu.gd`'s touch test drives the settings screen through the real
+view, and the view's job is to persist — so the suite wrote
+`user://skyroads.cfg`, flattening the sound flag and thirty completion
+counters. `Config` now has an overridable `path` and every test points it at a
+scratch file. **Any new suite that reaches a commit path must do the same.**
