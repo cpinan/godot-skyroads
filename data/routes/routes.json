@@ -1,22 +1,277 @@
 {
  "format": "3 bytes per tick: steer+1, accel+1, jump",
  "note": "A route is a proof the road is completable. Its absence is a search failure, not a proof of impossibility.",
+ "solver": "analysis/sra.py solve --beam 64 --max-ticks 8000; the roads that failed there were retried at --beam 256 --hold 2 --max-ticks 12000",
+ "solved": 15,
+ "total": 30,
  "routes": [
   {
    "road": 1,
    "solved": true,
    "ticks": 462,
    "seconds": 12.83,
-   "furthest_row": 55,
+   "furthest_row": 55.0,
    "rows": 55,
    "note": "completed in 462 ticks"
+  },
+  {
+   "road": 2,
+   "solved": true,
+   "ticks": 820,
+   "seconds": 22.78,
+   "furthest_row": 115.0,
+   "rows": 115,
+   "note": "completed in 820 ticks"
+  },
+  {
+   "road": 3,
+   "solved": true,
+   "ticks": 1578,
+   "seconds": 43.83,
+   "furthest_row": 60.0,
+   "rows": 60,
+   "note": "completed in 1578 ticks"
+  },
+  {
+   "road": 4,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 50.0,
+   "rows": 94,
+   "note": "every branch died"
+  },
+  {
+   "road": 5,
+   "solved": true,
+   "ticks": 889,
+   "seconds": 24.69,
+   "furthest_row": 126.0,
+   "rows": 126,
+   "note": "completed in 889 ticks"
+  },
+  {
+   "road": 6,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 10.0,
+   "rows": 48,
+   "note": "every branch died"
+  },
+  {
+   "road": 7,
+   "solved": true,
+   "ticks": 501,
+   "seconds": 13.92,
+   "furthest_row": 60.0,
+   "rows": 60,
+   "note": "completed in 501 ticks"
+  },
+  {
+   "road": 8,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 64.4,
+   "rows": 106,
+   "note": "every branch died"
+  },
+  {
+   "road": 9,
+   "solved": true,
+   "ticks": 565,
+   "seconds": 15.69,
+   "furthest_row": 70.0,
+   "rows": 70,
+   "note": "completed in 565 ticks"
+  },
+  {
+   "road": 10,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 4.9,
+   "rows": 81,
+   "note": "every branch died"
+  },
+  {
+   "road": 11,
+   "solved": true,
+   "ticks": 1406,
+   "seconds": 39.05,
+   "furthest_row": 199.0,
+   "rows": 199,
+   "note": "completed in 1406 ticks"
+  },
+  {
+   "road": 12,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 46.0,
+   "rows": 164,
+   "note": "every branch died"
+  },
+  {
+   "road": 13,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 9.0,
+   "rows": 112,
+   "note": "no progress for 400 rounds at row 9.0"
+  },
+  {
+   "road": 14,
+   "solved": true,
+   "ticks": 1550,
+   "seconds": 43.05,
+   "furthest_row": 237.0,
+   "rows": 237,
+   "note": "completed in 1550 ticks"
+  },
+  {
+   "road": 15,
+   "solved": true,
+   "ticks": 1336,
+   "seconds": 37.11,
+   "furthest_row": 201.0,
+   "rows": 201,
+   "note": "completed in 1336 ticks"
+  },
+  {
+   "road": 16,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 14.3,
+   "rows": 137,
+   "note": "every branch died"
+  },
+  {
+   "road": 17,
+   "solved": true,
+   "ticks": 1059,
+   "seconds": 29.41,
+   "furthest_row": 153.0,
+   "rows": 153,
+   "note": "completed in 1059 ticks"
+  },
+  {
+   "road": 18,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 56.8,
+   "rows": 163,
+   "note": "every branch died"
+  },
+  {
+   "road": 19,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 68.5,
+   "rows": 147,
+   "note": "every branch died"
+  },
+  {
+   "road": 20,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 4.0,
+   "rows": 186,
+   "note": "no progress for 400 rounds at row 4.0"
+  },
+  {
+   "road": 21,
+   "solved": true,
+   "ticks": 1317,
+   "seconds": 36.58,
+   "furthest_row": 130.0,
+   "rows": 130,
+   "note": "completed in 1317 ticks"
+  },
+  {
+   "road": 22,
+   "solved": true,
+   "ticks": 1146,
+   "seconds": 31.83,
+   "furthest_row": 160.0,
+   "rows": 160,
+   "note": "completed in 1146 ticks"
+  },
+  {
+   "road": 23,
+   "solved": true,
+   "ticks": 1489,
+   "seconds": 41.36,
+   "furthest_row": 224.0,
+   "rows": 224,
+   "note": "completed in 1489 ticks"
+  },
+  {
+   "road": 24,
+   "solved": true,
+   "ticks": 1679,
+   "seconds": 46.63,
+   "furthest_row": 83.0,
+   "rows": 83,
+   "note": "completed in 1679 ticks"
+  },
+  {
+   "road": 25,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 61.4,
+   "rows": 150,
+   "note": "every branch died"
+  },
+  {
+   "road": 26,
+   "solved": true,
+   "ticks": 1419,
+   "seconds": 39.41,
+   "furthest_row": 191.0,
+   "rows": 191,
+   "note": "completed in 1419 ticks"
+  },
+  {
+   "road": 27,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 43.4,
+   "rows": 166,
+   "note": "every branch died"
+  },
+  {
+   "road": 28,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 68.9,
+   "rows": 234,
+   "note": "every branch died"
+  },
+  {
+   "road": 29,
+   "solved": false,
+   "ticks": 0,
+   "seconds": 0.0,
+   "furthest_row": 21.2,
+   "rows": 136,
+   "note": "every branch died"
   },
   {
    "road": 30,
    "solved": false,
    "ticks": 0,
    "seconds": 0.0,
-   "furthest_row": 15.98,
+   "furthest_row": 18.1,
    "rows": 200,
    "note": "every branch died"
   }
