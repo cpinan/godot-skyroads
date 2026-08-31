@@ -364,11 +364,40 @@ static func road_cell(rd: int) -> Vector2i:
 	return p
 
 
+## A phone has no Esc key, so the two screens Esc would leave need a way out on
+## screen: the main menu closes the app, the road select goes back to it. Both
+## are exactly what Key.ESCAPE already does (MenuModel sets Exit.QUIT on MAIN
+## and Screen.MAIN on GO), so the button raises that key rather than inventing
+## a second way to navigate.
+##
+## Top right, clear of everything: the main menu's item box is at (127,128) and
+## the road grid's right column ends at x=270.
+const TOUCH_CLOSE_RECT := Rect2(298, 3, 18, 14)
+
+
+func _close_rect() -> Rect2:
+	return Rect2(_to_canvas(TOUCH_CLOSE_RECT.position),
+		_to_canvas(TOUCH_CLOSE_RECT.size))
+
+
+func _draw_close_button() -> void:
+	if not touch_ui:
+		return
+	var r := _close_rect()
+	var c := Color(0.83, 0.83, 0.72)
+	_overlay.draw_rect(r, c, false, 1.0)
+	var pad := Vector2(5.0, 5.0)
+	_overlay.draw_line(r.position + pad, r.end - pad, c, 1.0)
+	_overlay.draw_line(Vector2(r.end.x - pad.x, r.position.y + pad.y),
+		Vector2(r.position.x + pad.x, r.end.y - pad.y), c, 1.0)
+
+
 func _draw_overlay() -> void:
 	match screen:
 		Screen.MAIN:
-			pass                          # the box is placed as a node
+			_draw_close_button()          # the box is placed as a node
 		Screen.GO:
+			_draw_close_button()
 			var tick := _tex("gomenu_1")
 			for rd in 30:
 				var n: int = mini(cfg.completions[rd], TICK_MAX)
@@ -454,6 +483,11 @@ func _main_item_rect(i: int) -> Rect2:
 ## starts it: thirty small cells and an instant launch is a bad combination
 ## on a phone.
 func _keys_for_tap(p: Vector2) -> Array:
+	# the close button is the same key Esc raises, and it is checked first so
+	# it always wins over whatever it happens to sit above
+	if touch_ui and (screen == Screen.MAIN or screen == Screen.GO) \
+			and _close_rect().has_point(p):
+		return [MenuModel.Key.ESCAPE]
 	match screen:
 		Screen.MAIN:
 			for i in MenuModel.MAIN_ITEMS:
