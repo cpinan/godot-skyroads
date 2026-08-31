@@ -36,7 +36,7 @@ extends CanvasLayer
 ## sends the shell to the attract demo instead of the menu.
 signal done(skipped: bool)
 
-enum Phase { TITLE, ANIM, HOLD, WIPE, FLASH, PLATES, OVER }
+enum Phase { TITLE, ANIM, HOLD, WIPE, FLASH, PLATES, PORT_CREDIT, OVER }
 
 const SEQ_PATH := "res://data/gfx/intro_seq.json"
 
@@ -64,6 +64,10 @@ var _plate := 0
 ## a setup keyed on `_at() == 0` never runs at all — which is exactly how the
 ## credits came out blank the first time.
 var _plate_shown := -1
+
+## The port's own credit plate, built in code rather than from retail art.
+const CREDIT_COLOUR := Color(0.83, 0.83, 0.72)
+var _credit: Control
 
 var _scene: Control             ## title + anim deltas
 var _fade: ColorRect
@@ -242,6 +246,8 @@ func _tick() -> void:
 			_tick_flash()
 		Phase.PLATES:
 			_tick_plates()
+		Phase.PORT_CREDIT:
+			_tick_port_credit()
 
 
 func _tick_anim() -> void:
@@ -330,7 +336,7 @@ func _tick_plates() -> void:
 	var hold := _ms("plate_hold", 0x32)
 	var span_out := _ms("plate_out", 0x32)
 	if _plate + 1 >= _picts.size():
-		_finish()
+		_enter(Phase.PORT_CREDIT)
 		return
 	var spec: Dictionary = _picts[_plate + 1]
 	if _plate_shown != _plate:
@@ -359,9 +365,55 @@ func _tick_plates() -> void:
 		# end on the last plate rather than entering the phase once more with
 		# an index that has nothing behind it
 		if _plate + 1 >= _picts.size():
-			_finish()
+			_enter(Phase.PORT_CREDIT)
 		else:
 			_enter(Phase.PLATES)
+
+
+## One more plate after the original five, on the same 50/50/50 timing they
+## use — this port's own credit. It is a deliberate addition and the only text
+## in the game the 1993 binary does not draw, so it goes AFTER the original
+## sequence rather than into it: the five retail plates play unchanged, and
+## anything measuring them is unaffected. The C reference takes the opposite
+## approach and paints its port credit over the main menu, which is why
+## `render_menu.gd` cannot compare that screen at all.
+func _tick_port_credit() -> void:
+	var span_in := _ms("plate_in", 0x32)
+	var hold := _ms("plate_hold", 0x32)
+	var span_out := _ms("plate_out", 0x32)
+	if _credit == null:
+		_credit = Control.new()
+		_credit.position = Vector2.ZERO
+		_credit.size = Vector2(SkyRoads.SCREEN_W, SkyRoads.SQUARE_H)
+		_credit.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_credit.draw.connect(_paint_credit)
+		add_child(_credit)
+	var t := _at()
+	if t <= span_in:
+		_credit.modulate.a = float(t) / float(maxi(span_in, 1))
+	elif t <= span_in + hold:
+		_credit.modulate.a = 1.0
+	elif t <= span_in + hold + span_out:
+		_credit.modulate.a = \
+			1.0 - float(t - span_in - hold) / float(maxi(span_out, 1))
+	else:
+		_credit.visible = false
+		_finish()
+
+
+func _paint_credit() -> void:
+	# centred in the original's 320x200 space, drawn in the game's own 8x8
+	# font at the plates' own colour
+	# Same top margin as the retail credit plates, which intro_seq.json puts at
+	# screen_y 124-125 (intro_5 through intro_8). Text8x8 takes original
+	# 320x200 coordinates and the caller supplies the vertical scale, so this
+	# lands where a plate's own TextureRect would.
+	var lines := ["GODOT PORT 2026", "CARLOS PI\u00f1AN"]
+	var y := 125
+	for line in lines:
+		var x := (SkyRoads.SCREEN_W - Text8x8.width(line)) / 2
+		Text8x8.draw(_credit, line, x, y, CREDIT_COLOUR, SkyRoads.PIXEL_ASPECT)
+		y += 12
 
 
 func handle_input(ev: InputEvent) -> void:

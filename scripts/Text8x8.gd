@@ -23,6 +23,28 @@ static func _ensure_loaded() -> void:
 	_glyphs = (JSON.parse_string(f.get_as_text()) as Dictionary)["glyphs"]
 
 
+## The exported font is font8x8_basic: ASCII only, 128 glyphs, because the
+## original used the BIOS ROM font (int 10h ax=1130h) which is not
+## redistributable. The Godot port's own credit line needs an n-tilde, so it is
+## built from the `n` the font does have — shifted down a row with a tilde laid
+## into the gap — rather than inventing bitmap data or misspelling the name.
+## Nothing in the original's own text needs a glyph above 127.
+const N_TILDE := 241
+const TILDE_ROW := 0x36            ## columns 1,2,4,5; bit 0 is leftmost
+
+
+static func _glyph_for(code: int) -> Array:
+	if code == N_TILDE:
+		var n: Array = _glyphs[110]          # 'n'
+		var out := [TILDE_ROW, 0]
+		for row in range(0, GLYPH_H - 2):
+			out.append(n[row])
+		return out
+	if code < 0 or code >= _glyphs.size():
+		code = 63                             # '?'
+	return _glyphs[code]
+
+
 static func width(s: String) -> int:
 	return s.length() * GLYPH_W
 
@@ -35,10 +57,7 @@ static func draw(ci: CanvasItem, s: String, x: int, y: int, colour: Color,
 	if _glyphs.is_empty():
 		return
 	for i in s.length():
-		var code := s.unicode_at(i)
-		if code < 0 or code >= _glyphs.size():
-			code = 63                     # '?'
-		var g: Array = _glyphs[code]
+		var g: Array = _glyph_for(s.unicode_at(i))
 		for row in GLYPH_H:
 			var bits: int = g[row]
 			for col in GLYPH_W:
