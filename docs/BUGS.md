@@ -1108,11 +1108,28 @@ not possible at all from inside the tree. Two measurements, at 1440x810:
 With `keep`, Godot attaches the root viewport to the letterboxed sub-rect;
 the surround is not part of any viewport and no draw call can reach it. The
 only way to paint there is `aspect=expand` plus rendering the game into a
-fixed 320x240 `SubViewport` — which moves what `Main._capture_*` grabs, since
-those read `get_viewport().get_texture()`. That is the parity capture path,
-and this document's own rule is not to change it without measuring. So the
-bars stay black, and this is here so the next person does not spend the hour
-again.
+fixed 320x240 `SubViewport`. Scoping that properly turns up **two** coupling
+points, not one:
+
+- **The parity capture path.** `Main._capture_shot`, `_capture_roadend` and
+  `_capture_menu` all read `get_viewport().get_texture()`. Inside a
+  `SubViewport` that is the wrong texture, so all three move — and that is the
+  path this document's own rule says not to change without measuring.
+- **The touch input path.** Events would arrive through a
+  `SubViewportContainer`, so the transform changes. `touch_shell.gd` maps
+  synthetic touches with `get_root().get_final_transform()`, which would no
+  longer be the transform that matters, and the suite runs at two window sizes
+  precisely to catch that class of mistake.
+
+Everything visual has to move: `_world`, `_hud`, `_menu`, `_intro`,
+`_roadend`, `_touch` and the fade layer.
+
+So the bars stay black for now. **The right time to do this is the first task
+of the mobile phase**, when the touch layer is being revisited anyway and both
+coupling points are already open — not bolted onto a desktop-parity pass, where
+it would put the two most protected paths in the project at risk for a
+cosmetic gain. This note is here so the next person does not spend the hour
+rediscovering that the letterbox is unreachable.
 
 ### 12.3 — #29b / #39b: the capture was of a tick nobody asked for
 
@@ -1232,3 +1249,96 @@ changes for ordinary play.
 
 Worth keeping in mind beyond this one suite: a windowed capture takes focus,
 so anything typed while the gate runs goes into the game.
+
+### 12.6 — collision, read out of the EXE. Clean.
+
+`BUGS.md` has said since #31 that `TUN_INNER`/`TUN_OUTER` are the COLLISION
+profile and disagree wildly with what the original DRAWS. That was established
+by measuring the drawn side. The collision side had never been read out of the
+binary at all — so with §11 finding eleven defects in the shell and §12.1 one
+more in the composer, it was overdue.
+
+`fn_1685` is the collision test, `fn_1584` the per-slice profile it calls:
+
+```
+fn_1685(z32, x, y):
+    right = tile_at(z, x + 0x700)          # 0x700 is the ship's half-width
+    left  = tile_at(z, x - 0x700)
+    if (right | left) & 0x00f:             # low nibble: the cell has floor
+        if y < 0x2800 and y + 0x600 > 0x2480:   return true      # landing
+    if y + 0x680 <= 0x2800:                     return false     # too low to hit
+    if not ((left | right) & 0xf00):            return false     # nothing stands
+    t = 0x17 - ((x / 0x80 - 0x31) % 0x2e)       # slice across the column
+    step = -0x1700
+    if t <= 0: t = 1 - t; step = +0x1700
+    return fn_1584(tile_at(z, x), t, y)
+        or fn_1584(tile_at(z, x + step), 0x2f - t, y)
+
+fn_1584(tile, t, y):
+    if t > 0x25: return false
+    h = (y - 0x2200) / 0x80
+    switch tile & 0xf00:
+      0x100 tunnel:   return INNER[t] <= h < OUTER[t]
+      0x200 low:      return y < 0x3200
+      0x300 tun_low:  return y < 0x3200 and h >= INNER[t]
+      0x400 full:     return y < 0x3c00
+      0x500 tun_high: return y < 0x3c00 and h >= INNER[t]
+      default:        return false
+```
+
+`INNER` is `ds:0x46`, `OUTER` is `ds:0x92`, **38 entries each** — the bound is
+`t > 0x25` at `0x158d`, not the 24 a half-column would suggest.
+
+**Everything matches.** `sra/sim.py`'s `solid` and `_solid_block` reproduce
+both functions branch for branch, including the asymmetric `<` / `<=` at the
+`y + 0x680` gate, and `SkyRoads.TUN_INNER` / `TUN_OUTER` are byte-identical to
+the two tables across all 38 entries. The GDScript side comes along
+transitively: the three-way differential already proves C, Python and GDScript
+agree on 24 fields across 60,964 ticks, and the Python is now anchored to the
+binary rather than to the C reference.
+
+So the eleven roads with no route are **not** blocked by a physics defect. That
+was worth establishing before tuning a search against them — a wrong collision
+profile would have made "unsolvable" mean something else entirely.
+
+It also confirms the #31 note from the other side: the collision arch really is
+a different shape from the drawn one. `INNER[0] = 16` and `OUTER[0] = 32` in
+units of `0x80`, against a drawn vault of `ARCH_OUTER_PX` 19 and `ARCH_BORE_PX`
+16 in screen pixels. Two profiles, both authentic, and neither is the other.
+
+### 12.7 — what the remaining road-2 gap is made of
+
+With the tick pinned (§12.3) and the reference corrected (§12.1), road 2 at
+t=640 sits at 10.46% of road pixels differing. About 2 points of that is
+irreducible — single-pixel silhouette edges from rasterising a 3D scene
+against a 2D span filler, measured in §12.3 — so the real target is ~8.
+
+Classifying every differing pixel by which palette index each side chose turns
+that number into a ranked list of causes rather than a mood:
+
+| C index -> port | px | what it is |
+|---|---|---|
+| 13 -> 28 | 560 | deck colours, and NOT adjacent shades — a whole row band painted from the wrong row |
+| 68 -> 69, 69 -> 70, 70 -> 67 | 727 | the arch gradient's four bands, boundaries in the wrong place |
+| 68 -> 61, 61 -> 64, 61 -> 63, 64 -> 61 | 537 | block top/front/side, so face boundaries |
+| 0 -> 61 | 119 | the original draws NOTHING and the port draws block top |
+| 53 -> 61 | 91 | backdrop where the port draws block top |
+
+By band, the differences concentrate at rows 56..71 (1443 px, the horizon,
+where a row is a couple of pixels tall and a sub-tick of depth repaints all of
+it) and rows 152..167 (571 px, hard against the dashboard).
+
+**The arch bands are the one with a known fix.** `RoadMesh.TUNNEL_ARCH_LEFT` /
+`_MID` / `_RIGHT` and their slice boundaries were fitted to reproduce the
+measured AREAS of each record through this camera, not the records' own
+extents — the comment there says so. `tools/dump_bands.c archlines` prints the
+exact painted mask per record, so the boundaries can be taken from the data
+instead of fitted. Worth about 2 points if it lands.
+
+**`0 -> 61` deserves a look before the rest.** 119 pixels where the original
+paints nothing at all and the port paints a block top is not a boundary error;
+it is geometry that should not be there. Small, but it is the only entry in
+this table that is a drawing fault rather than a placement one.
+
+Nothing in this section is fixed yet. It is here so the next attempt starts
+from a ranked list, and because "the residual is ~10%" is not a finding.
