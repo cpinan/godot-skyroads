@@ -41,15 +41,54 @@ Measured parity, as of the last verification run:
 
 | what | result |
 |---|---|
-| Simulation vs C and Python reference engines | **86,476 ticks, 24 fields, three engines, identical** |
+| Simulation vs C and Python reference engines | **60,964 ticks, 24 fields, three engines, identical** |
 | Dashboard band vs the DOS frame | **0 differing pixels** across a whole run |
 | Menu screens (road select, settings, help) vs DOS | **0 differing pixels** |
 | Backdrop vs its source art | **0 differing pixels** |
-| Roads completed end to end, in the real scene | **15 of 30** — the other 15 have no solved route yet |
-| Road geometry, road 2 | ~6% of road pixels, thin one-pixel edges |
+| Roads completed end to end, in the real scene | **19 of 30** — the other 11 have no solved route yet |
+| Road geometry, road 2 | ~9.5% of road pixels, of which ~2 points is irreducible |
+
+**Measure road parity in RGB, not palette indices.** Classifying to the
+nearest palette entry counts differences nobody can see: road 26's greys sit
+4/255 apart, and index comparison reported 33% where RGB reports 10%. See
+[`docs/BUGS.md`](docs/BUGS.md) §12.8. Every figure above is RGB.
 
 The remaining road-geometry difference is documented rather than hidden — see
-[`docs/BUGS.md`](docs/BUGS.md), entries #29b and #29c.
+[`docs/BUGS.md`](docs/BUGS.md) §12.7 for what it is made of, and §12.12 for the
+one visible piece still unexplained: outer-column blocks are drawn 9-15% too
+large. Four attempts at the camera have measured worse and are recorded so
+they are not retried.
+
+---
+
+## Measured against the 1993 binary, not against a C port
+
+The port was originally written against `skyroads-port/`, a C reimplementation.
+That turned out to prove very little: **fourteen defects have now been found by
+disassembling the retail `SKYROADS.EXE`, and every one of them was present in
+the C reference too**, which is why no test could see them. The shell
+(`BUGS.md` §11, eleven of them), the frame composer (§12.1), and the gameplay
+song's no-repeat rule (§12.10).
+
+So "matches the C reference" is not evidence here. The method that replaced it:
+
+```python
+# code image starts at (u16 at EXE offset 8) * 16; addresses in the RE notes
+# are code-segment relative; the data segment is paragraph 0x66E
+from capstone import Cs, CS_ARCH_X86, CS_MODE_16
+```
+
+plus `tools/dump_bands.c kindlines <slot>` for the span records a composer
+consumes. Collision, the movement integrator, `in_tunnel`, surface effects,
+both tank burn rates, the HUD's three formulas and the autopilot have all been
+read this way and match (§12.6, §12.9); the attract demo and the road-end
+screen have not.
+
+The C reference is a measuring instrument, and where it was wrong it has been
+corrected — those patches live in
+[`docs/reference-corrections/`](docs/reference-corrections/), because
+`skyroads-port/` and `analysis/` are sibling checkouts and not part of this
+repository. **Apply them before trusting any parity number.**
 
 ---
 
@@ -113,17 +152,32 @@ Android and iOS presets are in `export_presets.cfg`; both need the matching
 export templates installed, and Android additionally needs the build template
 (Project → Install Android Build Template) because Play wants an AAB.
 
-A touch build differs from a desktop one in four places, all of them shell,
-none of them simulation:
+A touch build differs from a desktop one in six places, all of them shell,
+none of them simulation. `SkyRoads.is_mobile()` gates them, and it is Android
+and iOS specifically — not `OS.has_feature("mobile")`, which is also true of a
+web export on a touch device:
 
 - **A thumbstick and a jump button** (`scripts/TouchControls.gd`). The drawn
   circles are a hint; the hit areas are the whole left and right halves of the
   screen, and the stick's origin follows the thumb that starts it. Both feed
   `PlayerInput.from_axes` — the same function the joystick and mouse devices
   use — so the simulation is handed the same three values it always was.
-- **A pause box, top right.** Tap to pause; tap it again to leave the road.
-  That is the original's `P` and its "ESC while paused" in one control, since
-  a phone has neither key.
+- **A pause box, top LEFT**, the farthest point on the screen from the jump
+  button so it cannot fire mid-jump. It opens **RESUME / RESTART / QUIT** over
+  a dimmed frame — the original's `P` and its "ESC while paused", plus the
+  restart a phone has no other way to ask for.
+- **An X in the top right of the main menu and the road select.** A phone has
+  no Esc, and those are the two screens Esc would leave. Both raise
+  `Key.ESCAPE` rather than adding a second way to navigate, so the main menu
+  quits the app and the road select goes back — exactly what the model already
+  does with that key.
+- **No keyboard wording.** The retail menus say "Press Esc to exit menu" and
+  "Press SPACE to view next page", painted into the 320x200 pictures. On mobile
+  those lines are covered with background taken from the SAME ROW's left margin
+  — the wording is centred, so the margin is always background and the row
+  keeps its own lighting — and the port writes "TAP OUTSIDE TO GO BACK" and
+  "TAP TO TURN THE PAGE" in the game's own 8x8 font. One derived texture in
+  memory; no art file is modified and nothing is forked.
 - **Taps navigate the menus.** Each hot region is an overlay pict's own
   rectangle out of `gfx.json`, so the layout is the original's rather than
   invented. On the road list a tap selects and a second tap on the same road
@@ -137,6 +191,18 @@ none of them simulation:
 The screen stays letterboxed at 4:3 (`stretch/aspect="keep"`). "Expand" would
 show more of the world than DOS did and quietly invalidate every parity
 measurement in `docs/BUGS.md` on the one platform nobody is measuring.
+
+**The letterbox is large, and it cannot be painted.** `scale_mode` is integer,
+so the picture takes the largest whole multiple that fits: on a 2992x1344
+screen that is 5x — 1600x1200 at offset (696, 72), because 6x would need 1440
+rows. That leaves 696px of black either side. Filling it needs `aspect=expand`
+plus the game rendered into a fixed 320x240 `SubViewport`, which moves both
+what `Main._capture_*` photographs and the transform `touch_shell.gd` maps taps
+through. See the end of `docs/BUGS.md` §12 — it is a mobile-phase job, not a
+tweak.
+
+That 5x offset is also the number to compute tap coordinates from when driving
+a device over `adb`. Getting it wrong looks exactly like a broken button.
 
 To see the touch layout without a phone:
 
@@ -173,8 +239,10 @@ out to be wrong, against the retail binary. Four things follow from that.
 **The simulation is bit-exact.** A three-way differential runs the same input
 through the C reference, a Python model and this GDScript implementation and
 compares 24 state fields on every tick — position, velocity, fuel, oxygen,
-collision flags, the lot. 86,476 ticks over the 30 shipped levels and 80
-randomised roads, with no disagreement.
+collision flags, the lot. 60,964 ticks over the shipped levels and 150
+randomised trials, with no disagreement — and the Python side is now anchored
+to the retail binary rather than to the C reference, so the agreement means
+something it did not before.
 
 **The renderer is derived from the original's tables, not fitted by eye.** The
 DOS game has no 3D: every scanline of every tile shape is a span list baked
@@ -211,7 +279,7 @@ nobody repeats them.
 ## Tests
 
 ```sh
-./verify.sh                    # 478 checks, 16 suites
+./verify.sh                    # 484 checks, 77 green lines
 THREEWAY=1 ./verify.sh         # + C vs Python vs GDScript on real levels
 ```
 
@@ -275,3 +343,10 @@ one.
 **SkyRoads** is by **Bluemoon Interactive** (Jaan Tallinn, Marko Kaasik,
 Ivar Annamaa), 1993. This is an unofficial port. All game design, artwork and
 music are theirs.
+
+**Godot port, 2026 — Carlos Piñan.** The game credits it after the original's
+five plates, on the same timing, rather than over the main menu.
+
+There is no store release: this repository is the deliverable. The package name
+`com.cpinan.skyroads` and the absent keystore and iOS team id are all fine as
+they are, and nothing here should be spent on store assets or signing.
