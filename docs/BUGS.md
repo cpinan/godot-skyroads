@@ -1595,3 +1595,44 @@ horizontal — `tools/dump_bands.c lines` prints the per-row, per-column floor
 extents that would drive it. It is the largest single visible discrepancy left
 in the renderer, and the most likely to reward being done properly rather than
 fitted.
+
+### 12.13 — driving the vertical axis from the DOS ladder: measured much worse
+
+The fourth camera-adjacent attempt in this document, and the fourth to fail.
+
+The reasoning looked strong. `row = DOS_P200 + DOS_F200 * (1 - h) / d` predicts
+the baked band edges exactly — 102, 76, 61, 52, 46, 41, 37 for d = 2.55..8.55,
+which is dr7-near through dr2-far, seven for seven — and `HALF_BLOCK_Y`
+0.216433 lands the half-block top at row 82 against the table's 81. So the
+shader was changed to take POSITION.y from that ladder instead of the pinhole,
+exactly as it already takes x from `dos_lane`.
+
+Measured against the corrected reference, RGB > 16:
+
+| frame | before | after |
+|---|---|---|
+| road 1 t=120 | 11.4% | **50.3%** |
+| road 1 t=160 | 13.3% | **53.2%** |
+| road 26 t=240 | 10.1% | **48.1%** |
+| road 26 t=1000 | 7.3% | **76.0%** |
+
+Reverted. Road 1 t=160 reads 13.0% again, which is the same number inside
+capture jitter.
+
+**Why the premise was wrong.** The pinhole is ALREADY fitted to those row tops
+— `analysis/sra/project.py` has `row_tops_from_trekdat` and `fit_camera`, and
+B = 2.550 came out of exactly this table. Replacing it with the ladder does not
+add information; it discards a fit that reconciles the whole frame in favour of
+one that is only correct for vertices lying exactly on the sampled rows.
+
+**And the evidence for a problem was bad.** 12.12 cited road 26's row
+boundaries landing in the wrong places — measured by palette-index
+classification, on the one road §12.8 had already shown that metric invents
+differences on, because its greys are 4/255 apart. Using a metric one section
+after documenting that it lies is the actual mistake here, and it is worth more
+than the failed change.
+
+What survives: the outer-column block bbox measurements in 12.12, which were
+taken in RGB and stand. Something is still wrong there. The cause is not known,
+the ladder is not it, and the next attempt should start by re-measuring those
+blocks with a mask that cannot pick up road or backdrop pixels.
