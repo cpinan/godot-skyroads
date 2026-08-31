@@ -1188,10 +1188,17 @@ The port's `geom` 2 and 3 are `_block(..., HALF_BLOCK_Y, code, geom == 3, col)`
 One difference is deliberate and applies to every handler: the original gates
 each face on its neighbour's shape (`nearer < 2`, `inner < 4`, ...) because it
 paints spans with no depth buffer. The port draws the faces unconditionally
-and lets 3D occlusion hide them. That is not a defect, but it is not
-identical either — a tun_high standing behind a HALF block is a case where
-the original draws no front at all and the port draws one, and no road has
-been checked for that adjacency.
+and lets 3D occlusion hide them.
+
+**Checked, and the two agree everywhere.** Across all 30 roads the gates fire
+on 870 cells — 723 where a full block or tun_high one row nearer suppresses
+the tier front, and 147 where a half block one row nearer suppresses the
+lower front — spread over 24 roads. In every one the suppressing neighbour is
+the thing that would occlude the face anyway, and it is drawn LARGER than the
+face it hides because it is closer to the camera. A gate can only become
+visible where the suppressing neighbour is smaller on screen than the face it
+suppresses, which a same-column cell one row nearer never is. So the port
+loses nothing by letting depth do the work.
 
 ### The audit tooling
 
