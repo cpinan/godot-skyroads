@@ -1,0 +1,58 @@
+--- a/src/core/render.c
++++ b/src/core/render.c
+@@ -226,28 +226,46 @@
+     }
+ }
+ 
++/* CORRECTED 2026-08-31 against the retail SKYROADS.EXE at 0x2fb0, which this
++ * had wrong in two ways: it drew the six kind-4 arch records, which 0x2fb0
++ * never touches, and it left out the kind-3 pair that splits the lower front
++ * around the bore. A tun_high is not a tunnel with a tier on top — it is a
++ * FULL-HEIGHT BLOCK whose lower front is pierced, exactly the shape kind 4
++ * draws with an unpierced front. The two handlers differ only here:
++ *
++ *   0x2f3c (kind 4): nearer<2 -> seek 3, fill            (plain lower front)
++ *   0x2fb0 (kind 5): nearer<2 -> seek 1, fill 0x41       (the bore interior)
++ *                    nearer<2 -> seek 3, skip, fill, fill (front split by it)
++ *
++ * and both then share the seek-2 lower side and the seek-5 tier verbatim.
++ * Confirmed against the decoded records: at phase 0 / dr7 / ci1 the kind-3
++ * pair carves an arch 16 px high at the lane centre and 20 px half-wide at
++ * the deck, which is ARCH_BORE_PX to the pixel. */
+ static void compose_tun_high(compctx *cc)      /* 0x2fb0 */
+ {
+     compose_floor(cc);
+     if (shape(cc->nearer) < 2) {
+         seek_kind(cc, 1);
+-        fill_record(&cc->f, cc->half, 0x41);
++        fill_record(&cc->f, cc->half, 0x41);                /* bore interior */
+     }
+     seek_kind(cc, 2);
+-    skip_record(&cc->f);
++    skip_record(&cc->f);                                    /* no lower front */
+     if (shape(cc->inner) < 2)
+-        fill_record(&cc->f, cc->half, 0);
+-    seek_kind(cc, 4);
+-    for (int i = 0; i < 6; i++)
+-        fill_record(&cc->f, cc->half, 0);
++        fill_record(&cc->f, cc->half, 0);                   /* lower side */
++    if (shape(cc->nearer) < 2) {
++        seek_kind(cc, 3);
++        skip_record(&cc->f);                                /* plain front */
++        fill_record(&cc->f, cc->half, 0);                   /* left of bore */
++        fill_record(&cc->f, cc->half, 0);                   /* right of bore */
++    }
+     seek_kind(cc, 5);
+-    fill_record(&cc->f, cc->half, blockcolor(cc->tile));
++    fill_record(&cc->f, cc->half, blockcolor(cc->tile));    /* tier top */
+     if (shape(cc->inner) < 4)
+-        fill_record(&cc->f, cc->half, 0);
++        fill_record(&cc->f, cc->half, 0);                   /* tier side */
+     else
+         skip_record(&cc->f);
+     if (shape(cc->nearer) < 4)
+-        fill_record(&cc->f, cc->half, 0);
++        fill_record(&cc->f, cc->half, 0);                   /* tier front */
+ }
+ 
+ static void compose_tile(compctx *cc)
