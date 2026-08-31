@@ -19,7 +19,16 @@ boot_splash/bg_color=Color(0, 0, 0, 1)
 ; taller than wide, so the honest design size is 320x240.
 window/size/viewport_width=320
 window/size/viewport_height=240
+; The design size above is the picture. These two are only how big the desktop
+; window opens: 4x of 320x240. They do NOT change the viewport, so every parity
+; measurement still runs against 320x240 — verify.sh passes --resolution
+; 640x480 explicitly and is unaffected.
+window/size/window_width_override=1280
+window/size/window_height_override=960
 window/stretch/mode="canvas_items"
+; Whole-number upscaling only. A fractional scale resamples the 320x240 image
+; and smears the one-pixel edges the road parity work is measured in.
+window/stretch/scale_mode="integer"
 ; "keep" letterboxes on a phone's wide screen rather than showing more world
 ; than DOS did. That is the point: every parity measurement in docs/BUGS.md
 ; assumes the 320x200 field of view, and "expand" would quietly invalidate

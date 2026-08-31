@@ -93,20 +93,28 @@ done
 # The touch shell runs on its own: it needs `-- --touch` (the phone controls
 # are off on a desktop by design) and it pushes synthetic touches through the
 # real input pipeline, so it needs a window like the pixel suites do.
+# It runs once per window size: the taps are written in 320x240 canvas space
+# and divided by the root viewport's stretch on the way in, so a scale factor
+# that is wrong is only visible at a scale that is not 1. 1280x960 is the size
+# the desktop window now actually opens at (project.godot's *_override), and
+# it is an integer 4x, which the 640x480 case cannot distinguish from a
+# fractional one.
 if [ -e "$HERE/tests/touch_shell.gd" ]; then
-    out=$("$GODOT" --path "$HERE" --resolution 640x480 \
-        --script res://tests/touch_shell.gd -- --touch 2>&1)
-    if printf '%s' "$out" | grep -q "^Result:"; then
-        printf '%s\n' "$out" | grep -E "^Result:" | sed 's/^/       /'
-        if printf '%s' "$out" | grep -q "FAIL"; then
-            printf '%s\n' "$out" | grep "FAIL" | sed 's/^/       /'
-            echo "  FAIL touch_shell.gd"; status=1
+    for res in 640x480 1280x960; do
+        out=$("$GODOT" --path "$HERE" --resolution "$res" \
+            --script res://tests/touch_shell.gd -- --touch 2>&1)
+        if printf '%s' "$out" | grep -q "^Result:"; then
+            printf '%s\n' "$out" | grep -E "^Result:" | sed "s/^/       $res /"
+            if printf '%s' "$out" | grep -q "FAIL"; then
+                printf '%s\n' "$out" | grep "FAIL" | sed 's/^/       /'
+                echo "  FAIL touch_shell.gd ($res)"; status=1
+            else
+                echo "  ok   touch_shell.gd ($res)"
+            fi
         else
-            echo "  ok   touch_shell.gd"
+            echo "  FAIL touch_shell.gd ($res, no Result line)"; status=1
         fi
-    else
-        echo "  FAIL touch_shell.gd (no Result line)"; status=1
-    fi
+    done
 fi
 
 echo
