@@ -1551,13 +1551,42 @@ x cone is doing its job. **The whole error is at the bottom edge**: the port
 puts the block's base up to 8 screen rows lower, which reads as the block
 being nearer than it is.
 
-This is #28's camera. The port projects with a vertical pinhole at B=2.550 and
-a SEPARATE horizontal cone through y=32 (`SkyRoadsCamera.dos_x_scale`), which
-is why x matches and y does not: there is no equivalent correction on the
-vertical axis for a column away from the centre. The original has no camera at
-all — every span is baked per direction-row and per column, so its outer
-columns carry whatever vertical foreshortening the artist's tables encode, and
-a centre-fitted pinhole cannot reproduce it.
+**That explanation was WRONG and is corrected here.** The first version of this
+section said the port lacked a vertical correction for off-centre columns. The
+span tables refute it: the original's vertical geometry is **identical across
+all four columns** at every band, for floors and for both block groups.
+
+```
+floor   dr5  ci0 y[52..60]  ci1 y[52..60]  ci2 y[52..60]  ci3 y[52..60]
+        dr6  ci0 y[61..75]  ci1 y[61..75]  ci2 y[61..75]  ci3 y[61..75]
+        dr7  ci0 y[76..101] ci1 y[76..101] ci2 y[76..101] ci3 y[76..101]
+block   dr7  ci0 y[64..81]  ci1 y[64..81]  ci2 y[64..81]  ci3 y[64..81]
+tier    dr7  ci0 y[51..61]  ci1 y[51..61]  ci2 y[51..61]  ci3 y[51..61]
+```
+
+A pinhole's y is already independent of x, so there is nothing to correct on
+that axis — the shape of the port's projection is right and "add a vertical
+cone" would have been a fix for a cause that does not exist.
+
+**The error is in the depth-to-screen-row mapping.** Road 26's rows are a
+colour ramp, so its boundaries can be read straight off a frame:
+
+| | boundaries |
+|---|---|
+| reference, t=240 | 41, 42, 44, 47, 50, 56, 65, 112 |
+| port, t=240 | 41, 42, 49, 60, 109 |
+| reference, t=600 | 43, 44, ... |
+| port, t=600 | 41, 42, ... (two rows high) |
+
+The port's ladder does not land where the baked bands do, and it resolves
+fewer rungs. That is what makes an outer-column block read as nearer: it is
+sitting at the wrong depth on screen, not at the wrong height for its column.
+
+Not attempted. The fix is to make the depth ladder land on the baked band
+boundaries — the table above IS the target, `dr1` through `dr8` for phase 0,
+and `tools/dump_bands.c lines` prints it for all eight scroll phases. That is
+a derivation from data, not a re-fit, which matters because #28 already
+records that re-fitting the camera as a single pinhole is a dead end.
 
 Not attempted here. `docs/BUGS.md` records three parity "improvements" that
 measured worse, all of them camera-adjacent, and this one wants the vertical
