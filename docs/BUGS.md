@@ -1392,3 +1392,51 @@ unnoticed.
 palette indices. Index classification is still the right tool for asking WHICH
 SURFACE a pixel belongs to (§12.7 uses it for exactly that, on road 2), but it
 is the wrong tool for asking whether two frames differ.
+
+### 12.9 — the rest of the simulation, spot-checked against the EXE
+
+Continuing 12.6 into the parts that were still trusted only because the C
+reference agreed with the port:
+
+| what | EXE | verdict |
+|---|---|---|
+| surface effects | `fn_1a9c` + its switch at `0x1b40` | matches |
+| sticky / boost | `0x1b17` / `0x1b2f`, both `0x12f` on the 32-bit speed, both guarded by `expl_ctr == 0` | matches |
+| supply tile | `0x1ad6`: refill both tanks to `0x7530`, chirp unless BOTH were already `>= 0x6978` | matches |
+| burning tile | `0x1aab`: `end_state = 2`, `expl_ctr = 1`, sfx 0 | matches |
+| oxygen burn | `0x2a29`: `0x7530 / (0x24 * oxygen_secs)` per tick | matches |
+| fuel burn | `0x2a4e`: `(0x7530 / fuel_rows) * speed >> 16` | matches |
+
+Nothing found. Which is the point of writing it down — the value of an audit
+pass is as much in the parts it clears as the parts it breaks, and "clean"
+only means something if it is recorded with the address that was read.
+
+**Still unread**, and therefore still resting on the C reference: the autopilot
+proper (`fn_1d4d`) and its two helpers (`fn_1bb5`, `fn_1c20`), audio and music
+timing, the attract demo, and the road-end screen. On the record so far — one
+defect in the composer, none in collision, movement, HUD or surfaces — the
+autopilot is the biggest unaudited surface left and the obvious next target.
+
+### The autopilot, spot-checked
+
+`fn_1d4d` and its two helpers were the largest unaudited surface after 12.9.
+
+- **`fn_1bb5`** (is this cell fatal to land on) reproduces exactly, including
+  the awkward shape of it: `kind == 0x100` returns false outright, a non-zero
+  kind shifts the code down four bits before the surface nibble is read, and a
+  zero surface nibble answers `kind == 0` rather than falling through to the
+  `0xC` test.
+- **`fn_1c20`** (does this jump land) matches on every constant and on the
+  order of operations: `X_MIN`/`X_MAX` are `0x2f80`/`0xd080`, the lateral term
+  is `xvel * (speed + 0x618) / 0x200`, gravity comes from `ds:0x54b6` and the
+  side push from `ds:0x54a2`, and the x bounds are tested BEFORE `y += yvel`.
+- **`fn_1d4d`** matches structurally: land first and zero `ap_delta` if it
+  already lands, else `speed0 = speed`, `si = xvel`, `di = 1`, and the search
+  scales by `di/10` through `imul`/`idiv` exactly as `cdiv(xvel * di, 10)`
+  does, bounded by the six strengths `consts.py` already cites at `0x1efe`.
+
+**Honest limit on this one:** the four attempt branches inside the loop were
+matched on shape and constants, not traced one by one to their `_ap_lands`
+calls. The structure, the constants and the three-way differential all agree,
+so nothing suggests a defect — but this is a spot check, not the branch-for-
+branch treatment `fn_1685` got in 12.6, and it should not be quoted as one.
