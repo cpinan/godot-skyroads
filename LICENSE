@@ -66,3 +66,9 @@ checked against (`skyroads-port/`, outside this repository) are MIT, copyright
 2026 Ammaar Reshi, and carry their own exception for Nuked-OPL3 by Alexey
 Khokholov (LGPL-2.1). No code from either is included here; they were used as
 a reference and as a measuring instrument.
+
+This project runs on **Godot** (MIT, The Godot Engine contributors). A binary
+exported from it bundles the engine's own runtime, which carries Godot's
+licence and attribution requirements independently of this file. See
+`README.md`'s References section for the full list of what the port was built
+and measured against.

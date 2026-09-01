@@ -356,3 +356,43 @@ five plates, on the same timing, rather than over the main menu.
 There is no store release: this repository is the deliverable. The package name
 `com.cpinan.skyroads` and the absent keystore and iOS team id are all fine as
 they are, and nothing here should be spent on store assets or signing.
+
+---
+
+## References
+
+Everything this port was measured against, so that any claim in
+[`docs/BUGS.md`](docs/BUGS.md) can be re-checked from scratch.
+
+**The game.** SkyRoads, Bluemoon Interactive, 1993. Released as freeware by
+its authors and still distributed by them at
+[bluemoon.ee](http://www.bluemoon.ee/history/skyroads/) — over HTTP; the HTTPS
+host does not serve it. No retail file is included in this repository.
+
+**The measuring instrument.** `SKYROADS.EXE` from that release,
+sha256 `c3a55223e359749555535e138ef4219bc94458639e44f70edf3cfcb2f28c26ac`.
+Where this project says "read off the binary" it means that file, disassembled
+with [Capstone](https://www.capstone-engine.org/) in 16-bit mode: the code
+image starts at `hdrpar * 16` (the u16 at EXE offset 8), addresses are
+code-segment relative, and the data segment is paragraph `0x66E`. Every EXE
+address cited in the docs is reproducible from those four facts.
+
+**The C reference.** `skyroads-port/`, a reimplementation of the DOS engine by
+Ammaar Reshi (MIT), which sits outside this repository and was used as a
+differential oracle rather than as source. It is wrong in fifteen places that
+are now known; each is written up in
+[`docs/reference-corrections/`](docs/reference-corrections/) with the EXE
+address that settles it. It bundles Nuked-OPL3 by Alexey Khokholov
+(LGPL-2.1) for the FM synthesis.
+
+**The engine.** [Godot](https://godotengine.org/) 4.7.1 (MIT), using the
+`gl_compatibility` renderer on every platform — including mobile, which Godot
+would otherwise put on a different pipeline than the one every measurement in
+`docs/` was taken on.
+
+**The analysis toolkit.** `analysis/`, also outside this repository: the Python
+model of the simulation, the level and asset decoders, the route solver, and
+the three-way differential harness. `tools/` holds the C-side instruments —
+`replay_frames.c` for reference frames and surface maps, `dump_bands.c` for the
+baked span tables, and the Python comparators `frame_compare.py`,
+`sid_compare.py` and `make_compare.py`.
