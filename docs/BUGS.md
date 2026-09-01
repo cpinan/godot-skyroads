@@ -333,7 +333,7 @@ which is a known simplification rather than an oversight.
 
 | | notes |
 |---|---|
-| **Routes for 15 of 30 roads** | #26. The beam solver finishes 15 (1, 2, 3, 5, 7, 9, 11, 14, 15, 17, 21, 22, 23, 24, 26); the rest, including road 30's 200 rows of stepping stones, defeat it at `--beam 256 --hold 2`. Compute, not code. Unsolved roads are still covered field-by-field by the suites and by a deterministic probe trace |
+| **Routes for 19 of 30 roads** | #26. The solver finishes 19 (1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14, 15, 17, 21, 22, 23, 24, 25, 26) after the 2026-08-31 re-run: `--beam 1024 --hold 1 --max-ticks 16000` won road 4, and the `--sub-column 9` retry pass won 6, 8 and 25. The remaining eleven (10, 12, 13, 16, 18, 19, 20, 27, 28, 29, 30 — road 30 is 200 rows of stepping stones) still defeat both passes. Compute, not code. Unsolved roads are still covered field-by-field by the suites and by a deterministic probe trace |
 | **Split-top tunnel records** | #5. The top face of a bored block stays one quad; the original emits it in halves |
 | **Block centre-column colour** | #2/#3. A per-cell colour cannot split mid-column, so the centre column takes the left half's colour |
 | **Arch quarter-band shading** | #31 residue. The four bands are area-matched to the decoded records rather than derived, so the vault reads a shade cooler than the reference's |
@@ -1741,3 +1741,140 @@ and the port can be made to emit the same thing from its own materials.
 `docs/reference-corrections/` is the place for that instrumentation. Until it
 exists, no claim about WHICH surface is wrong should be trusted, including the
 ones in §12.7.
+
+**It exists now, and it has been run — see §12.15**, which also records why a
+`none` on the reference side is a question rather than a verdict.
+
+### 12.15 — the surface-ID buffer exists. What it says.
+
+§12.14 ended with a method and no instrument. The instrument is now built on
+both sides and has been run: `SR_SID_*` written by `fill_record` into
+`sr_surface_ids` (dumped beside each PPM when `SR_SURFACE_IDS=1`), the same
+identities emitted per quad by `RoadMesh` in `UV2.x` and painted by the road
+shader under `--surface-ids`, and `tools/sid_compare.py` to put the two maps
+side by side. Recipe, road 21 t=200:
+
+```bash
+clang -O2 -o /tmp/sr_replay_frames tools/replay_frames.c \
+    skyroads-port/src/core/{assets,audio,cfg,game,gfx,hud,lzs,play,render,tables,text}.c \
+    skyroads-port/src/thirdparty/opl3.c -lm
+SR_SURFACE_IDS=1 /tmp/sr_replay_frames <retail> <out> 21 godot/data/routes/road_21.bin 200 400
+$GODOT --path godot --resolution 640x480 -- --replay 21 \
+    --route-file res://data/routes/road_21.bin --shots <out> --shot-ticks 200 --surface-ids
+tools/sid_compare.py <out>/c_t0200.sid <out>/road21_t0200.sid.png [--column X]
+```
+
+**First result, and the blind spot it exposed.** Over the full view the maps
+disagree on 13.7% of pixels — but 2643 of those 4546 are `none` on the
+reference side, and `none` does not mean DOS drew nothing. The map records only
+what `fill_record` writes. At the lane centre the composer's nearest record
+stops at y=128 on every tick sampled (50, 100, 150, 200, 250), yet rows
+129..137 of the same frames **agree with the port in RGB to 14 pixels in 2880
+(0.5%)**. DOS paints them by another route. Restricted to rows 34..128, where
+both engines name a record, the disagreement is 9.0% and has essentially one
+member:
+
+```
+reference          port               pixels
+tunhigh.k5.0       floor.k0.0         1633      <- the whole defect
+none               floor.k0.0          503      <- blind spot again
+ship               *                   ~400     <- see below
+```
+
+**§12.14's near-field defect, attributed.** The column ladder at the lane
+centre, road 21 t=200 (phase 3, row 22 = `3 3 3 5 3 3 3`):
+
+```
+             reference           port
+y[ 34..101]  floor.k0.0          floor.k0.0    (runs to 111)
+y[102..128]  tunhigh.k5.0        tunhigh.k5.0  (112..137)
+```
+
+It is **not a wrong surface**, which is what every previous attempt assumed and
+what the palette made unfalsifiable. Both engines agree the surface is
+`tunhigh.k5.0`. The block top is also **not the wrong size** — 27 rows in DOS,
+26 in the port. It is in the wrong PLACE, about 10 rows too low.
+
+And the error is not a constant, so it is not one offset:
+
+```
+ x=100   boundary  ref 107   port 123    16 rows low
+ x=140             ref 102   port 112    10
+ x=160             ref 102   port 112    10
+ x=200             ref 102   port 112    10
+ x=240   floor top ref 113   port 113     0      exact
+```
+
+**A third finding: the ship and the road are not drawn at the same instant.**
+At x=140 the reference paints `ship` at y[59..67] and the port at y[51..59] —
+same height, 8 rows up, and visible in the pictures, not only the maps. That
+was first written up here as an altitude->row scale error. **It is not.** Both
+engines compute the sprite's row with the identical expression — C
+`render.c:395` `alt = ((on_sticky ? p->y - 0x80 : p->y)) / 0x80`,
+`top = 0x9d - alt`; port `ShipSprite.sync` `alt = (py - 0x80 if on_sticky else
+py) / 0x80`, `top = SCREEN_Y_BASE - alt` with `SCREEN_Y_BASE == 0x9D`. There is
+no scale between them to be wrong.
+
+It is a TICK ALIGNMENT. The ship is falling 8 rows per tick right here — the
+reference paints it at y[59..67] on t=200 and at y[67..75] on t=201 — and the
+port's t=200 frame sits one step above the reference's, which is to say at the
+reference's t=199. Compared against `c_t0199.sid` the ship lands within **one
+row** (ref y[52..60], port y[51..59]).
+
+The road does not follow it there. Against t=199 the block-top boundary goes
+from 10 rows out to 16 (ref 96, port 112): the road matches t=200 better while
+the ship matches t=199, and no single reference tick fits both. The port's road
+is running roughly one to two ticks ahead of its own ship, and the near-field
+number above is contaminated by that offset — which is the second reason not to
+chase the boundary with a camera change.
+
+This is §12.3's lesson again. `_capture_pending` deliberately does NOT rewind to
+the exact simulated tick (`SHOT_ALPHA_DEFAULT == 0.0`, and both the rewound and
+the inside-the-loop variants measured worse on road 2). That choice was made on
+whole-frame RGB, which cannot see the road and the ship disagreeing with EACH
+OTHER; the surface map can.
+
+**The `--shot-alpha` sweep was run, and it found a different bug: the flag does
+not reach the saved image at all.** Captures at `--shot-alpha` 0.0, 0.25, 0.5,
+0.75 and 3.0 are BYTE-IDENTICAL, with and without `--surface-ids`
+(md5 `2ceda940c3310195774ff2ad1ee11861` for every one). The flag is parsed and
+applied — a print in `_capture_pending` after the override shows
+`shot_alpha=0.750000 loop_alpha=0.750000 play.y=15331 prev_y=16134
+view_y=14729`, i.e. `view_y` moved 602 game units, 4.7 screen rows, and at
+alpha 3.0 it would move about 19 — yet not one pixel of the PNG changes.
+
+So the frame that gets saved is not the frame `_present()` was just asked to
+draw. `_capture_pending` does `override_alpha` -> `_present()` ->
+`RenderingServer.force_draw()` -> `get_viewport().get_texture().get_image()`,
+and what comes back is the frame drawn BEFORE the override — the ordinary
+`_present()` at line 699, at whatever alpha the frame loop happened to hold.
+
+This matters well beyond this section. **Every parity capture in the project is
+of a frame whose interpolation fraction was never pinned**, which is precisely
+the non-reproducibility #29b believed `--shot-alpha` had fixed, and it is a
+candidate explanation for "the same build measured 18.5% and 20.0% on
+consecutive runs". Fix the capture path first; until it is fixed, the alpha
+question above cannot be asked, and no near-field number here should be treated
+as better than approximate.
+
+**What is NOT the cause.** The eighth-of-a-row scroll quantisation
+(`SkyRoadsCamera.dos_scroll_row`) was written as this defect's explanation. It
+is not. A/B on the same frame:
+
+```
+                    sid differ    RGB differ (tol 16)
+scroll quantised    13.7%         8.6%
+continuous          14.1%         9.0%
+```
+
+Worth keeping — it wins on both metrics and it is read off the eight baked band
+tables rather than fitted — but it moves the misattributed band from 1685 px to
+1633 and leaves the boundary 10 rows out. Its docstring has been corrected.
+
+**Do not fix this by moving the camera** until the discriminator below is run.
+The error is +16 / +10 / +10 / +10 / 0 across x, and at t=350 the far field is
+2 rows HIGH while the near field is low — a single camera term cannot produce
+that, and four previous camera attempts measured worse (§12.13, #29b). The
+ladder now makes the honest experiment cheap: dump `dump_bands` for the phase,
+and compare the port's row tops against the baked table row by row, for a frame
+with geometry at several depths.
