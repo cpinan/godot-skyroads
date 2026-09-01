@@ -1713,3 +1713,31 @@ same way.
 Three hypotheses were tested and eliminated: the cover materials do not clip
 (they pass CLIP_NONE), they do not blend (palette entries are RGB, alpha 1),
 and the row is inside the visibility window. The cause is not yet known.
+
+**Why the attribution failed, definitively.** Road 21's palette contains exact
+duplicates:
+
+```
+[61] (247,150,142) == [68]   gap 0      block top  == arch band
+[62] (203,121,117) == [66]   gap 0      block front == arch rim
+[ 8] ( 81, 81, 81) == [34]   gap 0
+```
+
+Nearest-palette classification **cannot distinguish a block face from an arch
+band on this road** — they are byte-identical. So the block/arch split in the
+table above is not merely unproven, it is unknowable by that method, and the
+same doubt applies to every road whose palette repeats an entry.
+
+This is §12.8 again, one road over. That section established that index
+classification counts differences nobody can see; this one adds that it also
+merges surfaces nobody can separate. **Index classification is for asking
+"did this pixel change", never "what is this pixel".**
+
+**The method that would work**: render a SURFACE-ID buffer. The corrected
+reference already knows which record it is filling — `fill_record` is called
+once per record with the kind in hand — so writing the record index into a
+second buffer instead of the colour gives an unambiguous per-pixel surface map,
+and the port can be made to emit the same thing from its own materials.
+`docs/reference-corrections/` is the place for that instrumentation. Until it
+exists, no claim about WHICH surface is wrong should be trusted, including the
+ones in §12.7.
