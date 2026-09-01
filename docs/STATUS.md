@@ -1,6 +1,6 @@
 # STATUS — SkyRoads Godot port
 
-_Last updated: 2026-09-01 · git lives in `godot/` only, branch **`main`** (pushed) · `cpinan/godot-skyroads` (PRIVATE) · `tools/`, `docs/`, `analysis/`, `skyroads-port/` sit outside the repo_
+_Last updated: 2026-09-01 · git lives in `godot/` only, branch **`main`** (2 commits ahead of `origin/main`, NOT pushed) · `cpinan/godot-skyroads` (PRIVATE) · `tools/`, `docs/`, `analysis/`, `skyroads-port/` sit outside the repo_
 
 ## Next action
 
@@ -28,7 +28,7 @@ no parity number is of the frame it claims. Everything else here waits on it.
 
 ## In flight
 
-Seven uncommitted files (the surface-ID work + §12.15). Three measured, unfixed:
+Nothing uncommitted. Three measured, unfixed defects:
 
 - `scripts/Main.gd:491` `_capture_pending()` — **`--shot-alpha` never reaches the
   saved image.** Captures at 0.0/0.25/0.5/0.75/3.0 are byte-identical
