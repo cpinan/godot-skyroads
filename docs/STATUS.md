@@ -88,8 +88,12 @@ tools/make_compare.py  <out>/c_t0199.ppm <out>/road21_t0200.png shot.png
 - **Repo public or private** is undecided, and separate from publishing
   (settled: no store release). If it goes public, the derived `data/` is the
   thing to look at — `LICENSE` carves it out as Bluemoon's.
-- **§1.1 needs one live trace** and cannot close without a human: play with
-  `--record`, press `R` on a moment that feels wrong, replay the dump.
+- **§1.1 is NOT REPRODUCIBLE as of 2026-09-01** — the reporter played the
+  current build and could not make it happen. Five recordings (2,486 ticks,
+  two wall crashes, three falls) replay bit-identically through all three
+  engines and are kept as `tests/fixtures/traces/`. The likely explanation is
+  §2.1, which left the controls unbound for part of the original reporting
+  window. Not closed: cannot reproduce is not cannot happen.
 - **Mobile has never run on real hardware** — emulator only.
 - **The letterbox is CLOSED, not open** (§12.25). A 4:3 picture cannot fill a
   2.23:1 screen at any scale, so the bars are geometry rather than a defect.

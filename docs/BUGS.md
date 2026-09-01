@@ -106,10 +106,27 @@ and replay with `--replay <road> --route-file <path>`.
 > (crash-run ship delta 0,0 at rest and at the wall; ruler-road bands,
 > block sizes and convergence match).
 
-### 1.1 Holes and block collisions still feel wrong · UNRESOLVED
+### 1.1 Holes and block collisions still feel wrong · NOT REPRODUCIBLE (2026-09-01)
 
 The reporter has said this after each of the fixes in §2. It is the reason
 this document exists.
+
+**2026-09-01: the reporter played the current build and could not reproduce
+it.** That is the live trace this section had been blocked on since the
+beginning. Five recordings were taken across roads 2 and 4 — 2,486 ticks of
+real play, ending in two wall crashes and three falls — and every one of them
+replays **bit-identically through the C engine, the Python model and
+GDScript**: 2,515 ticks x 24 state fields, no divergence anywhere. They are
+kept as `tests/fixtures/traces/` so the evidence outlives the session.
+
+That does not prove the original reports were wrong; it proves they do not
+happen now. The most likely explanation is candidate 1 below, which this
+section has always said to re-test first: §2.1 left the controls unbound for
+part of the reporting window, and a ship that only does what gravity does
+would produce exactly this complaint about holes and collisions. The remaining
+candidates stay written down because "cannot reproduce" is not "cannot
+happen" — if it is ever felt again, take a recording at the moment and this
+section has somewhere to put it.
 
 **What has been ruled out, with evidence:**
 
