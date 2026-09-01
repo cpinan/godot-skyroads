@@ -1636,3 +1636,51 @@ What survives: the outer-column block bbox measurements in 12.12, which were
 taken in RGB and stand. Something is still wrong there. The cause is not known,
 the ladder is not it, and the next attempt should start by re-measuring those
 blocks with a mask that cannot pick up road or backdrop pixels.
+
+### 12.14 — the parity work has been tuned against the easiest road
+
+Everything in §12.7 was measured on road 2. A sweep of eight solved roads at
+three ticks each, RGB > 16 against the corrected reference with the tick
+pinned, says road 2 is the BEST case in the game:
+
+| road | mean | road | mean |
+|---|---|---|---|
+| 2 | **9.5%** | 24 | 16.8% |
+| 3 | 9.3% | 7 | 17.5% |
+| 26 | 11.0% | 15 | 21.1% |
+| 9 | 12.6% | 21 | **22.8%** |
+| 5 | 15.7% | | |
+
+Median **16.4%**, worst **30.0%** (road 21 at t=200). So the honest figure for
+the renderer is not 9.5% — that is the number for the one road every fix has
+been measured on.
+
+**And the dominant defect is not the arch bands.** Classifying every differing
+pixel by which surface each side chose:
+
+| frame | share involving a block face | largest single confusion |
+|---|---|---|
+| road 21 t=200 | 68% | `61 -> 7` x2170 — block TOP where the port draws deck |
+| road 5 t=400 | 57% | `0 -> 61` x940 — nothing where the port draws block top |
+| road 7 t=400 | 53% | `62 -> 9` x676 — block FRONT where the port draws deck |
+| road 15 t=400 | 52% | `61 -> 62` x1194 — block top where the port draws front |
+| road 24 t=600 | 3% | `69 -> 66` x540 — arch band vs rim |
+| road 3 t=200 | 0% | `3 -> 66` x143 — deck vs rim |
+
+Road 21's worst frame has **zero** pixels involving an arch colour. Two
+separate families, and the block one is much the larger:
+
+- **Block faces (roads 5, 7, 15, 21)** — the port puts the top/front/side
+  boundaries in the wrong place, and sometimes draws deck where a block top
+  belongs. This is the same thing §12.12 measured as "outer-column blocks 9-15%
+  too large", seen from the colour side rather than the bounding-box side.
+- **Arch bands (roads 3, 24)** — §12.7's `TUNNEL_BAND_EDGES_*`, fitted to
+  areas rather than derived from the records' paint order.
+
+`r = 0.45` between a road's tunnel fraction and its error, which is too weak to
+act on; the block family is the one to chase, and it is worth roughly three
+times the arch family across this sample.
+
+**None of this is fixed.** It is recorded because "road 2 is at 9.5%" has been
+the project's headline number and it is not representative — and because the
+next attempt should start on road 21, not road 2.
