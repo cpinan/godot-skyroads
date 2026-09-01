@@ -152,7 +152,24 @@ which also marks the setting currently in force in orange.
 
 ## On a phone
 
-![Touch controls on road 2](docs/screenshots/touch_road02.png)
+Run on a **Pixel 10 Pro XL**, 2026-09-01 — the first time this build had been
+on real hardware rather than an emulator. The whole screen, letterbox and all:
+
+![SkyRoads on a Pixel 10 Pro XL](docs/screenshots/mobile_device_frame.png)
+
+The bars are geometry, not an oversight. A 320x240 picture is 4:3 and the phone
+is 2.23:1, so no scale factor fills one with the other; `scale_mode="integer"`
+then costs 52% of the screen against 40% for a fractional scale that would
+resample the pixels. Keeping the exact field of view was a deliberate choice —
+`docs/BUGS.md` §12.25 has the numbers and the three options.
+
+| | |
+|---|---|
+| ![Driving](docs/screenshots/mobile_play.png) | ![Pause](docs/screenshots/mobile_pause.png) |
+| The stick deflected up, mid-run | RESUME / RESTART / QUIT over a dimmed frame |
+| ![Road select](docs/screenshots/mobile_road_select.png) | ![Settings](docs/screenshots/mobile_settings.png) |
+| Two taps: one selects, one starts | Keyboard rows dimmed, X to leave |
+
 
 Android and iOS presets are in `export_presets.cfg`; both need the matching
 export templates installed, and Android additionally needs the build template
@@ -172,16 +189,21 @@ web export on a touch device:
   button so it cannot fire mid-jump. It opens **RESUME / RESTART / QUIT** over
   a dimmed frame — the original's `P` and its "ESC while paused", plus the
   restart a phone has no other way to ask for.
-- **An X in the top right of the main menu and the road select.** A phone has
-  no Esc, and those are the two screens Esc would leave. Both raise
-  `Key.ESCAPE` rather than adding a second way to navigate, so the main menu
-  quits the app and the road select goes back — exactly what the model already
-  does with that key.
+- **An X in the top right of the main menu, the road select and the settings
+  screen.** A phone has no Esc, and those are the screens Esc would leave. It
+  raises `Key.ESCAPE` rather than adding a second way to navigate, so the main
+  menu quits the app and the other two go back — exactly what the model already
+  does with that key. **A tap that hits no item does nothing.** It used to mean
+  "go back", which reads fine with a mouse and is unusable with a thumb: a road
+  cell is 48x9 canvas pixels, so most of the road select is not a cell, and
+  reaching for a road mostly left the screen instead. Found on a Pixel 10 Pro,
+  which is also why the road hit areas are now the full row pitch rather than
+  the drawn cell.
 - **No keyboard wording.** The retail menus say "Press Esc to exit menu" and
   "Press SPACE to view next page", painted into the 320x200 pictures. On mobile
   those lines are covered with background taken from the SAME ROW's left margin
   — the wording is centred, so the margin is always background and the row
-  keeps its own lighting — and the port writes "TAP OUTSIDE TO GO BACK" and
+  keeps its own lighting — and the port writes "TAP THE X TO GO BACK" and
   "TAP TO TURN THE PAGE" in the game's own 8x8 font. One derived texture in
   memory; no art file is modified and nothing is forked.
 - **Taps navigate the menus.** Each hot region is an overlay pict's own

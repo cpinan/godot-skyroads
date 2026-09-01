@@ -185,9 +185,17 @@ func _touch_navigation() -> void:
 	menu.handle_input(_tap(menu, menu._item_rect(4).get_center()))
 	check(menu.set_sel == 4 and menu.cfg.sound_off == 1,
 		"a tap on sound-off selects it and commits")
+	# A tap on no item is INERT, and the close button is the way out. The old
+	# contract was "a miss backs out", which reads fine on a desktop with a
+	# mouse and is unusable on a phone: reported from a Pixel 10 Pro, where
+	# most of the road select is not a road cell, so trying to pick a road
+	# mostly left the screen instead. Same rule on both screens.
 	menu.handle_input(_tap(menu, Vector2(2, 2)))
+	check(menu.screen == Menu.Screen.SETTINGS,
+		"a tap on no item at all does nothing, it does not back out")
+	menu.handle_input(_tap(menu, menu._close_rect().get_center()))
 	check(menu.screen == Menu.Screen.MAIN,
-		"a tap on no item at all backs out to the main menu")
+		"the close button backs out of the settings screen")
 
 	# GO: a tap selects, a second tap on the SAME road starts it. One tap
 	# starting a road would launch one on nearly every mis-touch.
@@ -201,6 +209,19 @@ func _touch_navigation() -> void:
 		"the first tap on a road only moves the cursor")
 	menu.handle_input(_tap(menu, p))
 	check(started[0] == 13, "the second tap starts it (entry = index + 1)")
+
+	# and a tap on no road at all must NOT leave the road select. This is the
+	# Pixel 10 Pro report: the drawn cell is 48x9, so most of this screen is
+	# not a cell, and a miss used to mean ESCAPE.
+	menu.screen = Menu.Screen.GO
+	menu.go_sel = 12
+	started[0] = -1
+	menu.handle_input(_tap(menu, Vector2(2, 2)))
+	check(menu.screen == Menu.Screen.GO and started[0] == -1,
+		"a tap on no road leaves the road select alone")
+	menu.handle_input(_tap(menu, menu._close_rect().get_center()))
+	check(menu.screen == Menu.Screen.MAIN,
+		"the close button is how the road select is left")
 
 	# and with touch_ui off, taps must do nothing at all — a desktop build
 	# must not gain a second, undocumented control scheme

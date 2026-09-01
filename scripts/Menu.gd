@@ -250,7 +250,10 @@ const TOUCH_HINT_BANDS := {
 const TOUCH_HINT_MARGIN := 40
 ## What the port draws instead, once the retail wording is covered.
 const TOUCH_HINT_TEXT := {
-	"setmenu": ["TAP OUTSIDE TO GO BACK"],
+	# was "TAP OUTSIDE TO GO BACK", which stopped being true when a missed
+	# tap became inert -- see _keys_for_tap. The X is the way out now, on this
+	# screen as on the other two.
+	"setmenu": ["TAP THE X TO GO BACK"],
 	"helpmenu": ["TAP TO TURN THE PAGE"],
 }
 
@@ -425,6 +428,11 @@ func _draw_overlay() -> void:
 					Vector2(50, 11 * SkyRoads.PIXEL_ASPECT)),
 					Color(1, 1, 1, 0.35), false, 1.0)
 		Screen.SETTINGS:
+			# SETTINGS used to be left by tapping anywhere that was not an
+			# item, which is the same behaviour that made the road select
+			# unusable; now that a miss is inert it needs the same visible way
+			# out the other two screens have.
+			_draw_close_button()
 			# the cursor is the overlay pict; on a phone the three items the
 			# cursor can no longer reach are dimmed so the screen says why
 			if touch_ui:
@@ -489,8 +497,7 @@ func _main_item_rect(i: int) -> Rect2:
 func _keys_for_tap(p: Vector2) -> Array:
 	# the close button is the same key Esc raises, and it is checked first so
 	# it always wins over whatever it happens to sit above
-	if touch_ui and (screen == Screen.MAIN or screen == Screen.GO) \
-			and _close_rect().has_point(p):
+	if touch_ui and screen != Screen.HELP and _close_rect().has_point(p):
 		return [MenuModel.Key.ESCAPE]
 	match screen:
 		Screen.MAIN:
@@ -502,15 +509,28 @@ func _keys_for_tap(p: Vector2) -> Array:
 		Screen.GO:
 			for rd in MenuModel.ROAD_COUNT:
 				var c := road_cell(rd)
+				# The DRAWN cell is 48 x 9; the TOUCH target is the full row
+				# pitch and the full column, so the gaps between rows belong to
+				# the nearest road instead of to nothing. A finger is about 40
+				# device pixels across and the drawn cell is 22 tall.
 				var r := Rect2(_to_canvas(Vector2(c.x, c.y)),
 					Vector2(48, 9 * SkyRoads.PIXEL_ASPECT))
+				if touch_ui:
+					r = Rect2(_to_canvas(Vector2(c.x - 4, c.y - 1)),
+						Vector2(GO_COLUMN - 8,
+							GO_ROAD_PITCH * SkyRoads.PIXEL_ASPECT))
 				if r.has_point(p):
 					if rd == go_sel:
 						return [MenuModel.Key.ENTER]
 					model.go_sel = rd
 					_show()
 					return []
-			return [MenuModel.Key.ESCAPE]
+			# A tap that hits no road does NOTHING. It used to return ESCAPE,
+			# which closed the road select — and since a cell is 48x11 canvas
+			# pixels, most of this screen is not a cell, so on a phone the
+			# common outcome of trying to pick a road was leaving the screen.
+			# The close button is how you leave; reported from a Pixel 10 Pro.
+			return []
 		Screen.SETTINGS:
 			for i in MenuModel.SETTINGS_ITEMS:
 				if not _item_rect(i).has_point(p):
@@ -519,7 +539,7 @@ func _keys_for_tap(p: Vector2) -> Array:
 					return []         # a dimmed item is inert, not a way out
 				model.set_sel = i
 				return [MenuModel.Key.ENTER]
-			return [MenuModel.Key.ESCAPE]
+			return []                     # same rule as GO, same reason
 		Screen.HELP:
 			return [MenuModel.Key.ENTER]
 	return []
