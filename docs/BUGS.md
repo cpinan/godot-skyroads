@@ -1684,3 +1684,32 @@ times the arch family across this sample.
 **None of this is fixed.** It is recorded because "road 2 is at 9.5%" has been
 the project's headline number and it is not representative — and because the
 next attempt should start on road 21, not road 2.
+
+**Correction, same day.** The surface LABELS above do not survive checking. The
+table calls `61 -> 7` "block top where the port draws deck" because 61 is the
+default block-top colour and row 22's block-top nibbles are all 0, which made
+it a reasonable read. But the baked records put a half-block top at dr8 on rows
+82..99, and BOTH engines paint something else there — so which record each
+index belongs to is not established, and the "52-68% block faces" split is
+built on that same guess.
+
+What survives, because it is measured rather than inferred:
+
+- **The per-road spread.** Median 16.4%, worst 30.0% on road 21, road 2 best at
+  9.5%. That is a straight RGB comparison and needs no labels.
+- **The defect is one boundary in the near field.** Down the centre lanes of
+  road 21 t=200, the two engines agree exactly above DOS row 102 and below row
+  114, and disagree only between: one surface boundary sits 12 rows lower in
+  the port. Near edge exact, far edge short.
+- **The geometry in view is a single row two behind the ship** — road 21 row
+  22, `3 3 3 5 3 3 3`.
+
+And one fact that constrains any explanation: **dr9 (-2) has no floor records
+at all**, and `post-ship` (0x240) has none either. The original draws nothing
+two rows behind the ship, and `pre-ship` (0x210) duplicates dr7's own band.
+Whatever the port is drawing back there, the original is not drawing it the
+same way.
+
+Three hypotheses were tested and eliminated: the cover materials do not clip
+(they pass CLIP_NONE), they do not blend (palette entries are RGB, alpha 1),
+and the row is inside the visibility window. The cause is not yet known.
