@@ -2386,3 +2386,71 @@ intended rather than left open as a defect. Note for anyone reopening it: the
 scale mode is a DISPLAY setting and parity runs are windowed at
 `--resolution 640x480`, an exact 2x, so a mobile-only scale change could never
 have shown up in a measurement either way.
+
+### 12.26 — the unrouted roads are a FUEL problem, and the solver optimises the wrong thing
+
+STATUS has called these seven "verification coverage, not defects — collision is
+clean, so nothing makes them unwinnable" and "beam width is exhausted". The
+first half is right for the wrong reason and the second half is wrong. **No
+road routed by this section** — what it establishes is why they fail, which is
+not what was assumed.
+
+**Fuel is spent per DISTANCE, not per throttle.** `sim.step` burns
+`(TANK_FULL // fuel_rows) * speed >> 16` every tick, unconditionally — airborne
+too — and the ship covers `speed / 65536` rows in the same tick. The speed
+cancels: a tank buys exactly `fuel_rows` rows however the road is driven.
+Nineteen of the thirty roads are LONGER than their tank, and most carry many
+supply tiles (floor nibble 9, which resets fuel AND oxygen to full when the
+ship is grounded on one). Four of the seven unrouted roads are fuel-short:
+
+```
+road  rows  fuel_rows  headroom  supply tiles
+ 12    164     150       -14      1  (row 151, col 0)
+ 18    163     150       -13      1  (row 141, col 3)
+ 28    234     225        -9      0
+ 29    136     120       -16      1  (row  97, col 3)
+ 20    186     195        +9      0
+ 27    166     200       +34     82
+ 30    200     201        +1      0
+```
+
+**The beam never collects the single tile. Not once.** Instrumenting a full
+search of each of 12, 18 and 29 for a fuel increase: **zero refuels**. It is
+not that the tile is hard to reach — roads 14, 22 and 23 are fuel-short with
+one to three tiles each and all three are routed. It is that these three put
+the tile somewhere the beam has no reason to go. Road 18's sits in a one-row
+deck-level slot: `4/0` full block at row 140, `0/9` supply at 141, `5/5`
+tunhigh at 142, with a void at col 3 for the three rows before. The ship must
+ride the block tops, drop about 40 px into a single-row gap, and carry on
+through the bore. Every grounded visit to that column during a whole search was
+at `y = 0x3C00`, block-top height — never the deck at `0x2800`. It goes over
+the slot, every time.
+
+**Road 28 has no supply tile at all and is still finishable.** The burn
+TRUNCATES: `(q * speed) >> 16` with `q = 133` is **zero** for any speed below
+493, and the ship still covers 0.0075 rows a tick. Nine rows of free crawling
+costs 1199 ticks against road 28's 5000-tick oxygen budget. So the fuel-short
+roads have two solutions — the tile, or driving slowly enough that fuel is free
+— and **no road in the game is unwinnable**. That is the same conclusion STATUS
+reached, but from the wrong premise: collision being clean says nothing about
+whether the tank reaches the end.
+
+**Which is why beam width was never the problem.** The beam's niche is keyed on
+`(row, column)` and within a niche it keeps the state furthest along, which is
+always the fastest. The thrifty line and the slow drop are discarded before
+they can pay off, at every width. Three changes were tried and are recorded
+here so they are not tried again blind: fuel in the de-dup key (`s.fuel >> 12`),
+a speed bucket in the NICHE rather than just the key, and a waypoint
+decomposition that searches to the refuel first and onward second. None routed
+a road, and the finer niches made 28 and 29 measurably WORSE by fragmenting the
+beam — they now stall at rows 15.7 and 17.0.
+
+**And two of them are not only a fuel problem.** Roads 28 and 29 stall at rows
+~16-17 whatever the fuel handling, so they have an early obstacle as well.
+Roads 12 and 18 reach 160.9 and 163.0 of 164 and 163 — those two fail at the
+end and at the end only, on fuel.
+
+What would actually be needed: a search whose objective is not progress. Every
+one of these roads is a constrained problem — reach a specific cell, or hold
+under a speed for a while — and a beam that ranks states by how far along they
+are cannot express either. That is a different solver, not a wider one.

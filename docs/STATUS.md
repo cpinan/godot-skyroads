@@ -94,9 +94,17 @@ tools/make_compare.py  <out>/c_t0199.ppm <out>/road21_t0200.png shot.png
 - **The letterbox is CLOSED, not open** (§12.25). A 4:3 picture cannot fill a
   2.23:1 screen at any scale, so the bars are geometry rather than a defect.
   Decided 2026-09-01: keep integer scaling and the exact field of view.
-- **Seven roads have no route**: 12, 18, 20, 27, 28, 29, 30. Roads 12 and 18
-  reach their LAST ROW (160.7/164 and 163.0/163) and never trigger the finish
-  gate, so for those two it is the tunnel-mouth entry, not traversal.
+- **Seven roads have no route**: 12, 18, 20, 27, 28, 29, 30 — and §12.26 says
+  why, which is not what this file used to say. Four of them (12, 18, 28, 29)
+  are FUEL-short: the tank buys exactly `fuel_rows` rows however the road is
+  driven, and those four roads are longer than their tank. Three carry exactly
+  one supply tile each and the beam collected it **zero** times in a full
+  search. Road 28 has no tile at all and is still finishable, because the burn
+  truncates to zero below speed 493. It is not beam width — the niche keeps the
+  state furthest along, which is always the fastest, so the thrifty line dies
+  at every width. Fuel in the key, a speed bucket in the niche and a waypoint
+  decomposition were all tried; none routed a road and the finer niches made 28
+  and 29 worse. It needs a solver whose objective is not progress.
 - **The attract demo and the road-end fade are anchored to the binary now**
   (§12.23): both were correct, and the C reference is no longer the reason to
   believe them.
