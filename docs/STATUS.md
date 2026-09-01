@@ -4,8 +4,9 @@ _Last updated: 2026-09-01 · git lives in `godot/` only, branch **`main`** · `c
 
 ## Next action
 
-Decide whether the repo goes public. Every engineering item that was on this
-list has been closed — three of them (§12.22, §12.24, §12.25) closed as
+Decide whether the repo goes public — the screenshots it would be judged on
+are now current, which was the condition for asking. Every engineering item on
+this list has been closed — three of them (§12.22, §12.24, §12.25) closed as
 "measured, nothing to fix", which is a result and not a deferral. What is left
 needs a human: §1.1's live trace, mobile on real hardware, and that decision.
 The seven unrouted roads are the only open engineering work, and they are
@@ -114,10 +115,13 @@ tools/make_compare.py  <out>/c_t0199.ppm <out>/road21_t0200.png shot.png
 - **The arch was NOT double-corrected by §12.19** — checked before §12.21 was
   built: the warp alone improved the mouth 7.7% -> 1.7% and the interior
   14.3% -> 10.2%.
-- **`docs/screenshots/compare_menu.png` was not regenerated** — the menus are
-  unchanged and still 0 differing pixels, so it is still true. The three road
-  ones were rebuilt with `tools/make_compare.py`; the port-only gallery further
-  down the README was not.
+- **The screenshots are all current as of 2026-09-01.** The three road
+  comparisons were rebuilt with `tools/make_compare.py` and the port-only
+  gallery with `--menu-shot` / `--shot-ticks`. `compare_menu.png` and
+  `menu_main.png` were regenerated and came out byte-identical, which is its
+  own small proof that the menus did not move. `intro_credits.png` is the one
+  left alone — the credits have not changed and there is no capture flag for
+  the intro.
 
 ## Do not redo
 
