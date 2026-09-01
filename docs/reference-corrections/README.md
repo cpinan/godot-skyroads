@@ -132,6 +132,35 @@ the last song asked for and the last gameplay song are the same value
 throughout, and both versions produce the identical sequence. The bug only
 shows in real play.
 
+### `0004-solver-altitude-retry.patch`
+
+Applies to `analysis/`, not to the C reference.
+
+The finish gate is `z past the last row AND in_tunnel(z, x, y)` — the road ends
+inside a tunnel and the ship has to be in the bore to trigger it. The beam's
+de-dup key carried `on_ground` and `jumping` but no HEIGHT, so two airborne
+states at different altitudes shared a niche and the high one could evict the
+low one at the very mouth. The signature is unmistakable once you look for it:
+the road is traversed and never finished. Road 18 reaches row 163.0 of 163,
+road 10 reached 84.1 of 81, road 12 reaches 160.7 of 164.
+
+A third and fourth pass now keep 10 bits of `s.y` (8-pixel buckets) in the key,
+in the same complementary-retry shape as `0002` — plain, sub-column, altitude,
+both — rather than changing the default, because splitting niches costs slots
+and loses roads elsewhere. Keeping whichever pass succeeds is sound for the
+same reason it was there: `verify()` replays the script from scratch, so a
+route found is a proof.
+
+**Road 19 fell to it** (147/147, 1798 ticks) after failing every plain and
+sub-column pass at four beam widths. Roads 10, 13 and 16 came from re-running
+the existing passes at the DEFAULT `--beam 48 --hold 3`; all three had failed
+at `--beam 1024 --hold 1`, which is the non-monotonicity `solve()`'s docstring
+warns about — a wider beam fills with airborne states and misses the gate.
+Routed roads went 19 -> 23 of 30.
+
+Roads 12 and 18 still reach their last row and never trigger the gate, so
+altitude is not the whole of it for them.
+
 ## Adding to this directory
 
 Keep one patch per defect, named `NNNN-<what>.patch`, and cite the EXE address

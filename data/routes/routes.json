@@ -1,8 +1,8 @@
 {
  "format": "3 bytes per tick: steer+1, accel+1, jump",
  "note": "A route is a proof the road is completable. Its absence is a search failure, not a proof of impossibility.",
- "solver": "analysis/sra.py solve --beam 64 --max-ticks 8000; the roads that failed there were retried at --beam 256 --hold 2 --max-ticks 12000. On 2026-08-31 the whole set was re-run at --beam 1024 --hold 1 --max-ticks 16000, which won road 4, and `sra solve` gained a second pass that keeps sub-column position in the de-dup key (--sub-column 9), which won roads 6, 8 and 25. The two passes are complementary, not ordered: the sub-column key also LOSES roads 5, 14 and 24, so it is a retry rather than a new default. See docs/reference-corrections/0002-solver-sub-column-retry.patch",
- "solved": 19,
+ "solver": "analysis/sra.py solve --beam 64 --max-ticks 8000; the roads that failed there were retried at --beam 256 --hold 2 --max-ticks 12000. On 2026-08-31 the whole set was re-run at --beam 1024 --hold 1 --max-ticks 16000, which won road 4, and `sra solve` gained a second pass that keeps sub-column position in the de-dup key (--sub-column 9), which won roads 6, 8 and 25. The two passes are complementary, not ordered: the sub-column key also LOSES roads 5, 14 and 24, so it is a retry rather than a new default. See docs/reference-corrections/0002-solver-sub-column-retry.patch On 2026-09-01 roads 13 and 16 were won at the DEFAULT --beam 48 --hold 3 with that same retry pass \u2014 both had failed at --beam 1024 --hold 1, which is the non-monotonicity the solver docstring warns about, not a new capability: a wider beam fills with airborne states and misses the finish gate. Re-run the whole set at the default before concluding a road is out of reach. Road 10 fell to --beam 64 --hold 3 on the same two passes. Road 19 fell to a THIRD pass added 2026-09-01 that keeps 10 bits of ALTITUDE in the de-dup key: the finish gate needs the ship inside the end tunnel, and on_ground plus jumping do not separate two airborne states at different heights, so the high one evicts the low one at the mouth. Roads 10, 12 and 18 are that shape \u2014 each reaches its last row and never triggers the gate. See docs/reference-corrections/0003-solver-altitude-retry.patch.",
+ "solved": 23,
  "total": 30,
  "routes": [
   {
@@ -88,12 +88,12 @@
   },
   {
    "road": 10,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 4.9,
+   "solved": true,
+   "ticks": 607,
+   "seconds": 16.86,
+   "furthest_row": 81.0,
    "rows": 81,
-   "note": "every branch died"
+   "note": "completed in 607 ticks"
   },
   {
    "road": 11,
@@ -115,12 +115,12 @@
   },
   {
    "road": 13,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 9.0,
+   "solved": true,
+   "ticks": 796,
+   "seconds": 22.11,
+   "furthest_row": 112.0,
    "rows": 112,
-   "note": "no progress for 400 rounds at row 9.0"
+   "note": "completed in 796 ticks"
   },
   {
    "road": 14,
@@ -142,12 +142,12 @@
   },
   {
    "road": 16,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 14.3,
+   "solved": true,
+   "ticks": 946,
+   "seconds": 26.28,
+   "furthest_row": 137.0,
    "rows": 137,
-   "note": "every branch died"
+   "note": "completed in 946 ticks"
   },
   {
    "road": 17,
@@ -169,12 +169,12 @@
   },
   {
    "road": 19,
-   "solved": false,
-   "ticks": 0,
-   "seconds": 0.0,
-   "furthest_row": 68.5,
+   "solved": true,
+   "ticks": 1798,
+   "seconds": 49.94,
+   "furthest_row": 147.0,
    "rows": 147,
-   "note": "every branch died"
+   "note": "completed in 1798 ticks"
   },
   {
    "road": 20,

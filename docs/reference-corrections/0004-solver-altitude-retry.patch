@@ -1,0 +1,115 @@
+--- a/sra/solver.py
++++ b/sra/solver.py
+@@ -49,7 +49,8 @@
+                      for b in (st + 1, ac + 1, jp))
+ 
+ 
+-def _key(s: sim.Sim, col_bits: int = 1, sub_column_bits: int = 0) -> tuple:
++def _key(s: sim.Sim, col_bits: int = 1, sub_column_bits: int = 0,
++         alt_bits: int = 0) -> tuple:
+     """Coarse state signature for de-duplication.
+ 
+     Two states that agree on grid cell, rounded speed, grounded-ness and the
+@@ -65,6 +66,14 @@
+     slots failed exactly as 1024 did, and 9 bits of sub-column solved it at
+     1024.
+ 
++    `alt_bits` keeps `s.y >> bits` as well, which splits each niche by HEIGHT.
++    The finish gate is `z past the last row AND in_tunnel(z, x, y)`, so a ship
++    that arrives at the mouth too high cannot finish however well it is placed
++    laterally — and `on_ground` plus `jumping` do not separate two airborne
++    states at different altitudes, so the high one can evict the low one in the
++    same lane. Roads 10 and 18 are exactly that shape: both reach the last row
++    (81.0/81 and 163.0/163) and neither triggers the gate.
++
+     It is not a free win and is off by default. Splitting niches gives each one
+     fewer slots at a fixed beam, so it also LOSES roads: measured over all 30
+     on 2026-08-31 it won 6, 8 and 25 and lost 5, 14 and 24. The two settings
+@@ -77,6 +86,8 @@
+     k = (s.z >> 16, col >> (col_bits - 1) if col_bits > 1 else col,
+          s.speed // 0x400, s.on_ground, s.jumping,
+          (s.side_push > 0) - (s.side_push < 0))
++    if alt_bits:
++        k = k + (s.y >> alt_bits,)
+     return k + (s.x >> sub_column_bits,) if sub_column_bits else k
+ 
+ 
+@@ -85,7 +96,7 @@
+ 
+ def solve(road: Road, beam: int = 48, hold: int = 3,
+           max_ticks: int = 6000, patience: int = 400,
+-          sub_column_bits: int = 0) -> Route:
++          sub_column_bits: int = 0, alt_bits: int = 0) -> Route:
+     """Beam search for an input script that completes `road`.
+ 
+     The beam is filled round-robin across niches keyed by lane and whether the
+@@ -124,7 +135,8 @@
+                     continue                    # died on this branch
+                 if s.tick > max_ticks:
+                     continue
+-                k = _key(s, sub_column_bits=sub_column_bits)
++                k = _key(s, sub_column_bits=sub_column_bits,
++                         alt_bits=alt_bits)
+                 if k in seen:
+                     continue
+                 seen.add(k)
+--- a/sra/cli.py
++++ b/sra/cli.py
+@@ -259,23 +259,37 @@
+         # succeeds is sound because the search is authoritative in one
+         # direction only: a route found is a proof, since verify() replays it
+         # from scratch.
+-        passes = [0] if args.sub_column is not None and args.sub_column == 0 \
+-            else [0, args.sub_column if args.sub_column else 9]
+-        for attempt, bits in enumerate(passes):
++        # A third and fourth pass split the niche by HEIGHT as well. The
++        # finish gate needs the ship INSIDE the end tunnel, and two airborne
++        # states at different altitudes share a niche, so the high one can
++        # evict the low one and the road then ends one row short forever:
++        # roads 10, 12 and 18 each reach the last row and never trigger it.
++        sub = 0 if args.sub_column == 0 else (args.sub_column or 9)
++        alt = 0 if args.altitude == 0 else (args.altitude or 10)
++        passes = [(0, 0)]
++        if sub:
++            passes.append((sub, 0))
++        if alt:
++            passes.append((0, alt))
++            if sub:
++                passes.append((sub, alt))
++        for attempt, (bits, abits) in enumerate(passes):
+             route = solver_mod.solve(road, beam=args.beam, hold=args.hold,
+                                      max_ticks=args.max_ticks,
+-                                     sub_column_bits=bits)
++                                     sub_column_bits=bits, alt_bits=abits)
+             ok, msg = (solver_mod.verify(road, route) if route.solved
+                        else (False, route.reason))
+             if route.solved and ok:
+                 break
+             if attempt + 1 < len(passes):
+-                print(f'road {road.index:>2}  retrying with '
+-                      f'--sub-column {passes[attempt + 1]} ({msg})')
++                nb, na = passes[attempt + 1]
++                print(f'road {road.index:>2}  retrying with --sub-column {nb} '
++                      f'--altitude {na} ({msg})')
+         results.append((road, route, ok, msg))
+         status = 'SOLVED' if route.solved and ok else (
+             'FOUND BUT REPLAY FAILED' if route.solved else 'unsolved')
+-        via = f' [sub-column {bits}]' if bits else ''
++        via = (f' [sub-column {bits}]' if bits else '') + \
++              (f' [altitude {abits}]' if abits else '')
+         print(f'road {road.index:>2}  g{road.gravity:<3} {road.rows:>3} rows  '
+               f'{status:<24} furthest row {route.rows_reached:>6.1f}/'
+               f'{road.rows}  {msg}{via}')
+@@ -1214,6 +1228,12 @@
+                         'this every lateral position in one collapses to a '
+                         'single niche and an off-centre survivor can never '
+                         'enter the bore')
++    s.add_argument('--altitude', type=int, default=10, metavar='BITS',
++                   help='bits of altitude kept in the de-dup key on the third '
++                        'and fourth RETRY passes (default 10, i.e. 8-pixel '
++                        'buckets; 0 disables them). The finish gate needs the '
++                        'ship inside the end tunnel, and on_ground alone does '
++                        'not separate two airborne states at different heights')
+     s.add_argument('--hold', type=int, default=3,
+                    help='ticks each action is held before branching again')
+     s.add_argument('--max-ticks', type=int, default=6000)
