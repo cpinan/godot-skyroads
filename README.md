@@ -119,6 +119,13 @@ ever reaches it.
 
 ![Intro credits](docs/screenshots/intro_credits.png)
 
+The port adds one plate of its own, after the original's five and on the same
+timing — drawn in the game's own 8x8 font at the plates' own colour rather than
+from any retail art, so it reads as part of the sequence without pretending to
+be one of Bluemoon's:
+
+![The Godot port credit](docs/screenshots/intro_port_credit.png)
+
 ---
 
 ## Running it
@@ -380,6 +387,14 @@ There is no store release: this repository is the deliverable. The package name
 they are, and nothing here should be spent on store assets or signing.
 
 ---
+
+## What is next
+
+`docs/PLAN.md` — four things the original never did: polishing the joystick and
+gamepad handling, deciding what "full screen" should mean on a phone (the
+letterbox is geometry, not an oversight — see `docs/BUGS.md` §12.25), a
+first-person mode, and a level editor. None is started, and the plan says for
+each one what it costs and which measured result it puts at risk.
 
 ## References
 
