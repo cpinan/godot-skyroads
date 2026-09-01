@@ -91,9 +91,14 @@ func _draw() -> void:
 func _label(text: String, world: Vector3, col: Color) -> void:
 	if _cam.is_position_behind(world):
 		return
-	# the road meshes are warped to the DOS horizontal cone in their vertex
-	# shader; warp the label anchor the same way or it drifts off its cell
-	world.x *= SkyRoadsCamera.dos_x_scale(_cam.global_position.z - world.z)
+	# the road meshes are warped to the DOS cone in their vertex shader —
+	# horizontally by dos_x_scale and, above the deck, vertically by
+	# dos_y_scale (BUGS §12.18) — so warp the label anchor both ways or it
+	# drifts off the cell it names
+	var depth: float = _cam.global_position.z - world.z
+	world.x *= SkyRoadsCamera.dos_x_scale(depth)
+	# the deck is y = 0 in world space, so height above it IS world.y
+	world.y *= SkyRoadsCamera.dos_y_scale(depth)
 	var p := _cam.unproject_position(world)
 	# Objects close to the camera project outside the frame; clamp their
 	# labels to the edge rather than dropping them, since those are exactly

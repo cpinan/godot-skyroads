@@ -116,6 +116,43 @@ static func cell_centre(row: int, col: int) -> Vector3:
 	return Vector3((col - 3.0) * COLUMN_WIDTH, 0.0, -float(row))
 
 
+## The VERTICAL twin of the cone below: how much SHORTER or taller the
+## original draws a raised surface than this pinhole does, at `depth`.
+##
+## The camera is a least-squares pinhole through the DECK band edges and it
+## reproduces those to 0.24 px. Raised surfaces are not on it. Measured off the
+## baked span tables (`tools/dump_bands.c kindlines <k>`, record 0 — the block
+## tier — at the lane centre x=159, every phase 0..7 and every band dr0..dr9),
+## the tier's apparent height above the deck as a fraction of the height this
+## camera gives it:
+##
+##     depth   0.80  1.05  1.55  2.05  2.55  3.55  4.55  5.55  6.55
+##     g       1.41  1.29  1.16  1.08  1.00  0.87  0.73  0.60  0.48
+##
+## The half-height block (kind 2) and the full-height block (kind 5) give the
+## same numbers to within the one screen row the tables are quantised to, so g
+## is a function of DEPTH ALONE and not of height — which is what makes it a
+## vertex scale rather than a per-kind fudge. It passes through exactly 1.0 at
+## BEHIND_ROWS, the ship's own depth: the block beside the ship is where the
+## pinhole puts it, and everything else is drawn flatter or taller than
+## perspective would draw it.
+##
+## a + b*d + c/d is the best of the closed forms tried (rms 0.015 over
+## d in [0.8, 7]; a + b*d alone is 0.031, a + b/d is 0.116). BUGS.md §12.18.
+const DOS_TIER_A := 1.23112
+const DOS_TIER_B := -0.12108
+const DOS_TIER_C := 0.19879
+## Below this the original draws nothing — the nearest band's near edge is off
+## the bottom of the composed window — and g would run away.
+const DOS_TIER_MIN_DEPTH := 0.80
+
+
+## The factor to scale a vertex's height above the deck by, at `depth`.
+static func dos_y_scale(depth: float) -> float:
+	var d := maxf(depth, DOS_TIER_MIN_DEPTH)
+	return maxf(DOS_TIER_A + DOS_TIER_B * d + DOS_TIER_C / d, 0.0)
+
+
 ## How much wider/narrower the DOS cone draws a lane at `depth` than this
 ## camera's pinhole does. Applied to view-space X by the road shader; use it
 ## anywhere screen X of ROAD geometry is computed on the CPU (labels).
@@ -195,6 +232,11 @@ void vertex() {
 	float dos_lane = max(%f * (y200 - %f), 0.001);
 	float pin_lane = 46.0 * %f / d;
 	v.x *= dos_lane / pin_lane;
+	// the vertical twin: the original draws raised surfaces flatter with
+	// distance than perspective does, and 1:1 at the ship's own depth
+	float gd = max(d, %f);
+	float tier = max(%f + %f * gd + %f / gd, 0.0);
+	v.y = (v.y + %f) * tier - %f;
 	POSITION = PROJECTION_MATRIX * v;
 }
 void fragment() {
@@ -211,6 +253,8 @@ void fragment() {
 %s
 }
 """ % [DOS_P200, DOS_F200, DOS_LANE_PER_LINE, DOS_X_VANISH_Y, BEHIND_ROWS,
+		DOS_TIER_MIN_DEPTH, DOS_TIER_A, DOS_TIER_B, DOS_TIER_C,
+		CAMERA_HEIGHT, CAMERA_HEIGHT,
 		clip_src, "\tALPHA = COLOR.a;" if transparent else ""]
 	var sh := Shader.new()
 	sh.code = code

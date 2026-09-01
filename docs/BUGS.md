@@ -2040,3 +2040,56 @@ ONE record of ONE tile kind at ONE column, so it is a candidate, not a change:
 before shipping it, run the same ladder for the low block (kind 2), the tunnel
 tier (kind 3) and the outer columns, and check it against §12.12's outer-column
 measurements, which are probably the same effect seen in colour.
+
+### 12.19 — the vertical warp, measured. Four roads, both metrics, all better.
+
+§12.18's candidate is now in `SkyRoadsCamera.dos_y_scale()` and applied to
+view-space Y in `make_dos_material`'s vertex stage, beside the horizontal cone
+it mirrors. One line of shader: the vertex's height above the deck is scaled by
+`g(d) = 1.23112 - 0.12108 d + 0.19879 / d`, clamped to `d >= 0.80` and
+`g >= 0`. The deck itself is at height 0 and is therefore untouched, which is
+what keeps the band edges the camera was fitted to exactly where they were.
+
+Measured on four roads, at the tick alignment of §12.17 and through the fixed
+capture of §12.16, over DOS rows 34..128:
+
+```
+                RGB > 16            surface ids
+road 21 t=200   7.9% -> 1.7%        7.8% -> 1.6%
+road  2 t=640   4.5% -> 1.5%       11.7% -> 8.7%
+road 26 t=240   2.0% -> 0.5%        5.5% -> 4.6%
+road  5 t=120   8.4% -> 2.0%       12.4% -> 6.3%
+```
+
+Nothing measured worse. The near-field boundary this started from — §12.14's
+"which surface is wrong", §12.15's "measured but unattributed", the thing four
+camera attempts made worse — reads:
+
+```
+reference                    port
+y[ 34.. 95] floor.k0.0       y[ 34.. 94] floor.k0.0
+y[ 96..128] tunhigh.k5.0     y[ 95..137] tunhigh.k5.0
+```
+
+One row, from sixteen.
+
+**Why this is not "touching the camera on a hypothesis".** The camera is
+unchanged: same focal length, same principal point, same 2.550 rows behind the
+ship, and the deck lands where it always did. What changed is a term read off
+the baked tables, in the same place and the same form as the horizontal cone
+that was already there for the same reason — the original's projection is not
+one pinhole, and X was already known not to be.
+
+**What is left in the numbers.** Road 2's surface map still disagrees on 8.7%
+where its picture disagrees on 1.5%; most of that is the `none` blind spot of
+§12.15 (the reference map records only what `fill_record` writes) rather than
+anything drawn wrong. The remaining RGB differences are 1-2% of road pixels,
+which is the order of the single-row quantisation in the tables themselves.
+
+**Still open.** `RoadMesh.ARCH_OUTER_PX` / `ARCH_BORE_PX` were measured at
+phase 0 / dr7, where `g = 0.868`, and converted to world units with `PIXEL_Y`,
+which is calibrated at the ship's own depth where `g = 1.000`. The arch now
+goes through the same warp as everything else, and road 21 — a tunnel road —
+improved by a factor of four, so it cannot be far wrong. It has not been
+re-derived, though, and if the arch is ever re-measured the ladder has to be
+divided out first.

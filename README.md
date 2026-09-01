@@ -45,19 +45,24 @@ Measured parity, as of the last verification run:
 | Dashboard band vs the DOS frame | **0 differing pixels** across a whole run |
 | Menu screens (road select, settings, help) vs DOS | **0 differing pixels** |
 | Backdrop vs its source art | **0 differing pixels** |
-| Roads completed end to end, in the real scene | **19 of 30** — the other 11 have no solved route yet |
-| Road geometry, road 2 | ~9.5% of road pixels, of which ~2 points is irreducible |
+| Roads completed end to end, in the real scene | **23 of 30** — the other 7 have no solved route yet |
+| Road geometry, RGB, rows 34..128 | **0.5% - 2.0%** of road pixels on roads 2, 5, 21 and 26 |
 
 **Measure road parity in RGB, not palette indices.** Classifying to the
 nearest palette entry counts differences nobody can see: road 26's greys sit
 4/255 apart, and index comparison reported 33% where RGB reports 10%. See
 [`docs/BUGS.md`](docs/BUGS.md) §12.8. Every figure above is RGB.
 
-The remaining road-geometry difference is documented rather than hidden — see
-[`docs/BUGS.md`](docs/BUGS.md) §12.7 for what it is made of, and §12.12 for the
-one visible piece still unexplained: outer-column blocks are drawn 9-15% too
-large. Four attempts at the camera have measured worse and are recorded so
-they are not retried.
+The road-geometry difference used to be five to twelve times larger, and what
+closed it was measurement rather than a better camera. The original's vertical
+projection is not one pinhole: the camera reproduces the DECK band edges to
+0.24 px, and RAISED surfaces are drawn on a different ladder entirely — read
+straight off the baked span tables, identical for half-height and full-height
+blocks, and exactly 1:1 at the ship's own depth. Applying it as a vertex term
+beside the horizontal cone that was already there took road 21 from 7.9% to
+1.7% and road 5 from 8.4% to 2.0%. See [`docs/BUGS.md`](docs/BUGS.md) §12.18
+and §12.19; §12.7 covers what is left, and four earlier attempts at moving the
+camera are recorded there so they are not retried.
 
 ---
 
