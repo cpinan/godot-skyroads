@@ -13,8 +13,12 @@
 #   settings    left/right over 5 items, up/down hops control row <-> sound row
 #   help        Enter pages through 3 screens, then back to the main menu
 #
-# Idle on the main menu for 10 seconds and the attract demo starts, exactly as
-# the original does.
+# The main menu does NOT start the attract demo on an idle timer. Sitting
+# through the whole intro is the only way to reach it: main @0x021e calls the
+# intro and branches on its return, 0 (nobody touched a key) setting the demo
+# state and non-zero opening this menu. See Main._end_intro and BUGS §11.11 —
+# the ten-second timer was the C reference's invention and this comment was
+# the last thing still claiming it.
 class_name Menu
 extends CanvasLayer
 

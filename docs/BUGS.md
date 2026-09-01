@@ -2231,3 +2231,158 @@ columns 0..2 — an order of magnitude looser than the vault boundaries, which
 are ±0.03. Whatever separates them is not a radial line, so the port still
 emits one rim record and `k4.7` still shows up as absent. That is the honest
 remainder, along with the one-row offset above.
+
+### 12.22 — the "one-row offset" is not one, and must not be fitted away
+
+§12.19 and §12.21 both ended by naming a residual one-row offset. It is not a
+defect and there is nothing to correct.
+
+**The comparison path is exact.** The ship sprite is blitted at DOS screen
+coordinates with no projection in it, and its box is identical in both engines
+at road 21 t=200 — `x[130,158] y[50,61]`. So the capture, the canvas mapping
+and `sid_compare`'s sampling are all right, and any difference is in the road
+geometry rather than in how it is measured.
+
+**The bias is a fifth of a row.** Pairing every sid boundary that both engines
+name the same way, down every column of five frames (n = 4071):
+
+```
+road  2 t=640   n= 981   mean -0.248 rows   100.0% within one row
+road 26 t=240   n= 125   mean +0.072        99.2%
+road  5 t=120   n=1032   mean -0.151        100.0%
+```
+
+and by depth the mean runs -0.09, -0.14, -0.35, -0.16, -0.28, -0.13 over DOS
+rows 32..127 — no trend, and everywhere well under half a row. The silhouette's
+x agrees to ±1 px, and at the lane centre the ladders are identical run for run,
+block tops included.
+
+So the ±1 row seen at individual boundaries is quantisation: a boundary whose
+true position is at y = 95.6 falls in row 95 for one engine and 96 for the
+other, and the reference's own position comes from a hand-baked table rather
+than from a formula, so there is no "correct" rounding to match.
+
+**Do not fix this.** Shifting the projection by the measured 0.2 rows would be
+fitting a constant to a metric with nothing behind it, which is what #29b and
+§12.13 did, twice, and measured worse for. The number to remember is that on
+clean frames **100% of paired boundaries already agree to within one row**.
+
+### 12.23 — the attract demo and the road-end fade, anchored to the binary
+
+These were the last two things resting on the C reference alone. Both turn out
+to be RIGHT; what was wrong is what they cited.
+
+**The attract demo.** Disassembling `SKYROADS.EXE`:
+
+- `main @0x021e` calls the intro and branches on its return: 0 — nobody
+  touched a key — sets `[0x9602] = 3`, and `@0x026c` pushes **0** and calls the
+  road loader, so the demo is always road 0. Non-zero opens the menu. There is
+  no idle timer anywhere; `Menu.gd`'s header comment was the last thing in the
+  tree still claiming one, and it is corrected.
+- `@0x5525` pushes `ds:0x0dec` — `"demo.rec"` — reads all `0x18fe` bytes (6398,
+  the retail file's exact size) into `ds:0x962e`.
+- `@0xa49` is the consumer: it divides the ship's 32-bit z by **`0x666`** and
+  reads ONE byte at that index, then takes `(b & 3) - 1` into `[0x933c]`,
+  `((b >> 2) & 3) - 1` into `[0x9600]`, and `(b >> 4) & 1` for jump.
+  `[0x933c]` is accel and `[0x9600]` is steer, from their own consumers:
+  `@0x24ac` multiplies `[0x933c]` by `SPEED_ACCEL 0x4B`, `@0x254c` multiplies
+  `[0x9600]` by `STEER_VEL 0x1D`.
+- `@0x0385` jumps back to `0x219`, the intro call, so a demo that runs out goes
+  back to the intro rather than to the menu.
+
+Every one of those matches the port: `DEMO_BYTES_PER_SAMPLE = 1638` is `0x666`,
+`Main._apply_replay_input` indexes `play.z / 1638`, `sra.demo.decode` unpacks
+the same three fields in the same order, and `_end_intro` branches the same
+way. The buffer covers `6398 * 1638 / 65536` = **159.9 rows** against road 0's
+55, so it can never be read past its end.
+
+**The road-end fade.** `fn_4b72(palette, direction, steps)` is called from
+fourteen sites and every one pushes `0x24` — 36 — for steps, in both
+directions; the single exception `@0x472b` pushes 0, an instant set. Its loop
+(`fn_4315`) and the 27-tick road-completed hold (`fn_443d`, `@0x2c90`) call the
+same per-frame wait `fn_4137`, so the fade's 36 steps are 36 of the ticks
+`RoadEnd` already counts — **1.0 s at 36.0036 Hz**, which is what `FADE_SECS`
+has always been. The constant is unchanged; its comment now cites the binary.
+
+Nothing in the port changed for either. What changed is that "matches the C
+reference" is no longer the reason to believe them.
+
+### 12.24 — the second rim record: measured, and deliberately not emitted
+
+§12.21 left `tunnel.k4.7` as the port's one unemitted arch record, worth 459
+pixels of the surface map at road 2 t=741. Measuring it settles it as a
+labelling artefact rather than a defect.
+
+**The two rims are the same colour.** Both `k4.6` and `k4.7` carry `k = 66` in
+the span tables, so `sr_quad[66]` resolves both to the same palette entry. The
+split is invisible: emitting the second record would move no pixel, and the 459
+is the surface map noticing that the port draws ONE quad where the reference
+writes two records over the same colour.
+
+**Only one of them is radial.** Their own edges, measured per band:
+
+```
+        rec6 left        rec7 left            width in ratio
+ci0     -2.730 ±0.265    -2.171 ±0.532        0.092 / 0.086
+ci1     -1.897 ±0.160    -1.438 ±0.408        0.087 / 0.088
+ci2     -1.109 ±0.070    -0.647 ±0.289        0.101 / 0.097
+```
+
+Both are narrow wedges of the same angular width, ~0.09, but per band `rec6`
+holds still (ci2: -1.127, -1.114, -1.103, -1.101 across dr5..dr8) while `rec7`
+swings 0.3 and moves OUTWARD as the row approaches. `rec7` is tied to the bore
+— a world-space opening whose projected width grows with proximity — not to
+the screen, so the §12.21 fan cannot express it.
+
+**And the port's rim is the right size.** The record map shows a gap between
+the two rims at the lower rows, which reads like the port's full-face rim quad
+overpainting. It is not: that gap is about which record CLAIMS a pixel, not
+what colour lands on it. Removing the mouth quad entirely and re-measuring:
+
+```
+                with rim    without rim
+road 2 t=710    1.7%        1.7%
+road 2 t=741    6.4%        9.9%
+```
+
+So the quad is carrying its weight, and the honest conclusion is that emitting
+`k4.7` means modelling a bore-edge band, in world space, to change no pixel and
+improve one metric that is already known to be counting a labelling difference.
+Not done, on purpose. §12.21's `_tunnel` comment and this section are the
+record of why.
+
+### 12.25 — the letterbox is geometry, and it stays
+
+Listed for weeks as a mobile job: "at integer 5x scaling a 2992x1344 screen
+shows 696px bars each side", with a proposed fix of `aspect=expand` plus a
+fixed 320x240 `SubViewport`. Measured, the framing was wrong — there is no
+fix, only a choice, and the choice is to keep it.
+
+A 320x240 picture is 4:3. A modern phone is 2.23:1. **No scale factor fills one
+with the other**; only cropping or distorting does. What the bars cost:
+
+```
+2992x1344   integer x5 -> 1600x1200   696 px sides   52.3% of screen unused
+2340x1080   integer x4 -> 1280x960    530 px         51.4%
+2778x1284   integer x5 -> 1600x1200   589 px         46.2%
+1920x1080   integer x4 -> 1280x960    320 px         40.7%
+```
+
+Most of that is INTEGER scaling rather than the aspect ratio: letting the image
+fill the height fractionally on 2992x1344 gives 1792x1344 and 40.1% unused,
+which buys 12 points at the price of resampling a pixel game — the one thing
+`window/stretch/scale_mode="integer"` exists to prevent. `aspect=expand` buys
+the space by showing MORE WORLD than the 320x200 field of view, which is not
+the original's picture and invalidates every number in this file.
+
+So the three real options are: keep it, scale fractionally on mobile only
+(soft pixels), or render into a `SubViewport` so the bars become paintable
+decoration (same 52%, but deliberate — at the cost of moving the parity
+capture path of §12.16 and the touch transform).
+
+**Decided 2026-09-01: keep it.** Integer scaling, exact field of view, bars
+where a 4:3 game puts them on a 21:9 screen. The item is closed as working as
+intended rather than left open as a defect. Note for anyone reopening it: the
+scale mode is a DISPLAY setting and parity runs are windowed at
+`--resolution 640x480`, an exact 2x, so a mobile-only scale change could never
+have shown up in a measurement either way.

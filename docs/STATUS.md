@@ -4,10 +4,12 @@ _Last updated: 2026-09-01 · git lives in `godot/` only, branch **`main`** · `c
 
 ## Next action
 
-Decide whether the repo goes public. Every parity item with a number on it is
-closed; what is left needs a human (§1.1's live trace) or a decision. If more
-parity is wanted, the two candidates are the second rim record and the one-row
-offset, both named in §12.21 and both small.
+Decide whether the repo goes public. Every engineering item that was on this
+list has been closed — three of them (§12.22, §12.24, §12.25) closed as
+"measured, nothing to fix", which is a result and not a deferral. What is left
+needs a human: §1.1's live trace, mobile on real hardware, and that decision.
+The seven unrouted roads are the only open engineering work, and they are
+coverage rather than defects.
 
 ## State
 
@@ -87,11 +89,23 @@ tools/make_compare.py  <out>/c_t0199.ppm <out>/road21_t0200.png shot.png
   thing to look at — `LICENSE` carves it out as Bluemoon's.
 - **§1.1 needs one live trace** and cannot close without a human: play with
   `--record`, press `R` on a moment that feels wrong, replay the dump.
-- **The letterbox.** Filling it needs `aspect=expand` plus a fixed 320x240
-  `SubViewport`, which moves both the capture path and the touch transform.
+- **Mobile has never run on real hardware** — emulator only.
+- **The letterbox is CLOSED, not open** (§12.25). A 4:3 picture cannot fill a
+  2.23:1 screen at any scale, so the bars are geometry rather than a defect.
+  Decided 2026-09-01: keep integer scaling and the exact field of view.
 - **Seven roads have no route**: 12, 18, 20, 27, 28, 29, 30. Roads 12 and 18
   reach their LAST ROW (160.7/164 and 163.0/163) and never trigger the finish
   gate, so for those two it is the tunnel-mouth entry, not traversal.
+- **The attract demo and the road-end fade are anchored to the binary now**
+  (§12.23): both were correct, and the C reference is no longer the reason to
+  believe them.
+- **The one-row offset is NOT a defect** (§12.22): mean signed boundary error
+  is -0.09 to -0.35 rows with no depth trend, the ship's box matches exactly,
+  and 100% of paired boundaries on clean frames agree within one row. Do not
+  fit a constant to it.
+- **The second rim record is deliberately not emitted** (§12.24): `k4.6` and
+  `k4.7` are the same palette entry, so the split moves no pixel, and dropping
+  the port's rim quad measures WORSE (6.4% -> 9.9%).
 - **The tunnel interior is still the worst frame**, but at 6.4% rather than
   14.3% (road 2 t=741). What is left is the second rim record, which the port
   does not emit because the `k4.6`/`k4.7` split is NOT radial (±0.3 to ±0.5,

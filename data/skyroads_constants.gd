@@ -38,6 +38,9 @@ const DATA_FILES = ["ROADS.LZS", "TREKDAT.LZS", "CARS.LZS", "DASHBRD.LZS", "MUZA
 const DEATH_HOLD = 108
 const DECK_SOLID_HI = 10240
 const DECK_SOLID_LO = 7808
+## 0x666 — DEMO.REC is indexed by POSITION, `demo[z / 0x666]`, at fn @0xa49.
+## One byte holds three fields: bits 0-1 accel + 1, bits 2-3 steer + 1,
+## bit 4 jump. Verified against the retail binary, not the C reference.
 const DEMO_BYTES_PER_SAMPLE = 1638
 const EDGE_PROBE_MAX = 14
 const EDGE_PROBE_STEP = 128

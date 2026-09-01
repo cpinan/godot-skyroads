@@ -85,7 +85,13 @@ var _touch: TouchControls
 ## than either scheme.
 var _touch_ui := false
 
-## fade_to pacing (game.c:86-92): 36 ticks out, switch, 36 ticks in.
+## fade_to pacing: 36 ticks out, switch, 36 ticks in. Read off the retail
+## binary rather than the C reference — `fn_4b72(palette, direction, steps)`
+## is called from fourteen places and every one of them pushes `0x24` for
+## steps, in both directions (the single exception, @0x472b, pushes 0 for an
+## instant set). Its loop and the 27-tick road-completed hold call the SAME
+## per-frame wait `fn_4137`, so 36 of its steps are 36 of the ticks RoadEnd
+## already counts: 1.0 s at 36.0036 Hz.
 const FADE_SECS := 1.0
 
 
