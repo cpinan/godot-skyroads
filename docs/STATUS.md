@@ -4,9 +4,11 @@ _Last updated: 2026-09-01 · git lives in `godot/` only, branch **`main`** · `c
 
 ## Next action
 
-Decide whether the repo goes public — everything else in this file is either
-green or an open question that needs a human. If more parity is wanted, the
-arch constants below are the next measurable thing.
+Fix the tunnel arch — §12.20. `_tunnel` emits four bands across a column where
+the original paints six, so two of the reference's records are never drawn, and
+inside a tunnel is five times worse than anywhere else measured. It is the last
+parity item with a number on it; everything else here is green or needs a
+human.
 
 ## State
 
@@ -85,11 +87,15 @@ tools/make_compare.py  <out>/c_t0199.ppm <out>/road21_t0200.png shot.png
 - **Seven roads have no route**: 12, 18, 20, 27, 28, 29, 30. Roads 12 and 18
   reach their LAST ROW (160.7/164 and 163.0/163) and never trigger the finish
   gate, so for those two it is the tunnel-mouth entry, not traversal.
-- **The arch constants have not been re-derived.** `RoadMesh.ARCH_OUTER_PX` was
-  measured at phase 0 / dr7, where the new ladder reads 0.868, and converted
-  with `PIXEL_Y`, which is calibrated where it reads 1.000. Road 21 improved
-  four-fold so it cannot be far wrong, but a re-measurement has to divide the
-  ladder out first.
+- **Inside a tunnel is the worst frame in the game — §12.20.** 10.2% of road
+  pixels on road 2 t=741, against 0.5-2.0% everywhere else, and the surface map
+  says all of it is arch BANDS taken for one another. `_tunnel` emits four
+  bands where the original paints six, so `tunnel.k4.4` and `k4.5` are never
+  drawn at all. That is #31, the unrecovered sector geometry, with a number
+  attached; §12.20 has the `dump_bands archlines` recipe, the measured band
+  boundaries, and the two things to settle before changing a constant.
+- **The arch was NOT double-corrected by §12.19** — that was checked: the warp
+  improves the tunnel mouth 7.7% -> 1.7% and the interior 14.3% -> 10.2%.
 - **`docs/screenshots/compare_menu.png` was not regenerated** — the menus are
   unchanged and still 0 differing pixels, so it is still true. The three road
   ones were rebuilt with `tools/make_compare.py`; the port-only gallery further

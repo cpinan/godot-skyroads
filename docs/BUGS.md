@@ -2093,3 +2093,62 @@ goes through the same warp as everything else, and road 21 — a tunnel road —
 improved by a factor of four, so it cannot be far wrong. It has not been
 re-derived, though, and if the arch is ever re-measured the ladder has to be
 divided out first.
+
+### 12.20 — inside a tunnel is the worst frame in the game, and it is the arch
+
+§12.19 asked whether the arch had been double-corrected. It has not: the warp
+improves tunnel frames like everything else. Road 2, the same route, one frame
+at the mouth and one from inside the vault:
+
+```
+                       RGB > 16          surface ids
+t=710  at the mouth    7.7% -> 1.7%      9.3% -> 4.0%
+t=741  inside          14.3% -> 10.2%   48.6% -> 44.9%
+```
+
+But inside a tunnel is still five times worse than anywhere else measured, and
+the surface map says exactly what it is — every one of the top disagreements is
+one arch band being taken for another:
+
+```
+reference        port             pixels
+tunnel.k4.4      tunnel.k4.1      1979
+tunnel.k4.4      tunnel.k4.2      1899
+tunnel.k4.3      tunnel.k4.2      1897
+tunnel.k4.3      tunnel.k4.1      1771
+tunnel.k4.2      tunnel.k4.1      1205
+tunnel.k4.5      tunnel.k4.0       640
+```
+
+Nothing is the wrong SURFACE — it is the vault throughout, in both engines. The
+bands are in the wrong places, and two of them do not exist: `_tunnel` splits
+the 46 slices of a column into FOUR bands at `TUNNEL_BAND_EDGES_*`, chosen to
+reproduce the measured areas, and the original paints SIX. `k4.4` and `k4.5`
+are therefore never emitted at all, which is why they head the table.
+
+This is #31 — the sector geometry was never recovered — with a number attached
+at last. The instrument for recovering it exists now. `dump_bands archlines`
+gives every span of every kind-4 record, and asking which record owns the
+TOPMOST pixel at each screen x gives the band boundaries directly, because the
+port's slices are strips at the arch's outer height:
+
+```bash
+/tmp/sr_dump_bands <retail> 0 archlines | awk -F, 'NR>1 && $1==7 && $2==1'
+```
+
+At phase 0 / dr7, that reads:
+
+```
+ci0  rec6:x[0,14] rec2:x[18,66] rec3:x[70,79] rec4:x[80,84] rec5:x[85,86]
+ci1  rec6:x[43,59] rec2:x[60,99] rec3:x[100,108] rec4:x[109,113] rec5:x[114,115]
+ci2  rec6:x[90,100] rec2:x[101,129] rec3:x[130,137] rec4:x[138,142] rec5:x[143,144]
+ci3  rec6:x[136,137] rec1:x[138,151] rec2:x[152,159]
+```
+
+Two things to settle before building on it. The bands are DIAGONAL ribbons
+following the vault, not vertical slabs — rec2 at ci1 runs x[96,99] at y=64 and
+x[60,62] at y=82 — so "the record that owns the topmost pixel" is the right
+question for the port's strip model but throws away how they meet lower down.
+And a record's x extent is wider than the 46-px column the port builds an arch
+inside (ci1 spans 73 px), so the mapping from record to column is not 1:1 and
+has to be worked out before any constant is changed.
