@@ -55,24 +55,14 @@ const ARCH_OUTER_PX := [19, 19, 19, 19, 18, 18, 18, 18, 18, 17, 17, 16,
 const ARCH_BORE_PX := [16, 16, 16, 16, 16, 15, 15, 15, 15, 14, 14, 13,
 	12, 12, 11, 10, 9, 8, 6, 4, 0, 0, 0, 0]
 
-## The six kind-4 arch records resolve through sr_quad to FOUR bands across
-## each lane, and the sequence runs ACROSS the lane rather than out from its
-## centre — a fixed light direction, not a symmetric gradient. Columns 0..2
-## take records k70..k73 through the left sr_quad entry, columns 4..6 the
-## same records through the right one, and the centre column takes k69/k70 on
-## its left half mirrored onto its right.
-const TUNNEL_ARCH_LEFT := [69, 68, 69, 70]
-const TUNNEL_ARCH_MID := [70, 69, 68, 69]
-const TUNNEL_ARCH_RIGHT := [71, 70, 69, 68]
-## Slice boundaries between those bands. The records are not equal slices of
-## the lane — decoded at dr7 they cover 5/24/35/36 % of an outer column's
-## drawn arch and 21/30/30/19 % of an inner one — so these edges are the ones
-## that reproduce the measured AREAS through this camera (the sector geometry
-## the original used to get there is not recovered; see BUGS #31). The centre
-## column's own split is near-symmetric, so it keeps quarters.
-const TUNNEL_BAND_EDGES_LEFT := [4, 29, 41]
-const TUNNEL_BAND_EDGES_MID := [11, 23, 34]
-const TUNNEL_BAND_EDGES_RIGHT := [5, 17, 42]
+## The six kind-4 arch records used to be approximated here as four bands cut
+## at fixed slice indices, chosen to reproduce the measured AREAS because the
+## sector geometry behind them was not recovered (#31). It is recovered now and
+## it is not a property of the geometry at all: the records are separated by
+## fixed RADIAL LINES through the lane cone's vanishing point, unchanged across
+## every band and every scroll phase. The boundaries live in
+## `SkyRoadsCamera.ARCH_BAND_RATIOS` and the road shader applies them per
+## fragment; a vault quad only has to say which column it belongs to.
 
 ## The surface identities both engines write into their parity buffers.
 const SurfaceIds = preload("res://scripts/app/SurfaceIds.gd")
@@ -143,6 +133,7 @@ func build(road: RoadData) -> void:
 		# near half, nearest last. Depth is still written and tested so the
 		# rows sort against each other and against their own hidden faces.
 		_cover_mats.append(SkyRoadsCamera.make_dos_material(true, true, false, 2 + i))
+	_set_arch_uniforms()
 	for n in get_children():
 		n.queue_free()
 	_floors.clear()
@@ -442,10 +433,6 @@ func _tunnel(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 	# compose_tunnel patches the bore's wall with 0x43 = 67, but the block
 	# variants (compose_tun_low / _high) use 0x41 = 65 for the same surface
 	var wall_c := _colour(wall)
-	var bands: Array = TUNNEL_ARCH_MID if col == 3 \
-		else (TUNNEL_ARCH_RIGHT if col > 3 else TUNNEL_ARCH_LEFT)
-	var edges: Array = TUNNEL_BAND_EDGES_MID if col == 3 \
-		else (TUNNEL_BAND_EDGES_RIGHT if col > 3 else TUNNEL_BAND_EDGES_LEFT)
 	var px := (x1 - x0) / 46.0
 	# heights at the 47 slice BOUNDARIES, so the surfaces slope with the arch
 	# instead of leaving vertical steps between slices
@@ -464,16 +451,15 @@ func _tunnel(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 		var o1 := outer[slice + 1]
 		var i0 := bore[slice]
 		var i1 := bore[slice + 1]
-		var band := 0
-		while band < 3 and slice >= int(edges[band]):
-			band += 1
-		var c: Color = _colour(bands[band])
-		# the reference paints SIX kind-4 records across the vault where this
-		# emits four bands; the ids follow its paint order, so the two the
-		# port never emits show up as absent rather than as a colour argument
+		# Which of the six kind-4 records this is depends on where the
+		# quad lands on screen, not on the slice it was built from, so the
+		# shader decides: the column rides in UV2.y and the fan does the
+		# rest. The colour and sid passed here are only the fallback for a
+		# material that has no fan (none in the game).
 		_quad(st, Vector3(sx0, o0, z1), Vector3(sx1, o1, z1),
-			Vector3(sx1, o1, z0), Vector3(sx0, o0, z0), c,
-			SurfaceIds.TUNNEL_K4_0 + band)
+			Vector3(sx1, o1, z0), Vector3(sx0, o0, z0),
+			_colour(SkyRoadsCamera.ARCH_RECORD_LEFT[2]),
+			SurfaceIds.TUNNEL_K4_0 + 2, col + 1)
 		if i0 > 0.0 or i1 > 0.0:
 			_quad(st, Vector3(sx0, i0, z1), Vector3(sx1, i1, z1),
 				Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), wall_c,
@@ -488,20 +474,50 @@ func _tunnel(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 ## (scripts/app/SurfaceIds.gd). It rides in UV2.x, which nothing else uses, so
 ## the surface map costs the normal render nothing: the shader reads it only
 ## when sid_mode is on.
+## `arch_col` is the grid column + 1 for a tunnel VAULT quad and 0 for
+## everything else. The vault takes its record from the shader's radial fan
+## rather than from a colour chosen here — see SkyRoadsCamera.ARCH_BAND_RATIOS.
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3,
-		col: Color, sid: int) -> void:
+		col: Color, sid: int, arch_col := 0) -> void:
 	for v in [a, b, c, a, c, d]:
 		st.set_color(col)
-		st.set_uv2(Vector2(float(sid), 0.0))
+		st.set_uv2(Vector2(float(sid), float(arch_col)))
 		st.add_vertex(v)
+
+
+func _materials() -> Array:
+	var out: Array = []
+	for m in [_floor_mat, _solid_mat, _split_far_mat, _split_near_mat]:
+		if m != null:
+			out.append(m)
+	out.append_array(_cover_mats)
+	return out
+
+
+## The arch fan needs the ROAD's palette, so it is set once the materials exist
+## and the road is known. Both halves are uploaded because a single frame has
+## fragments on either side of the screen centre and sr_quad gives them
+## different entries for the same record.
+func _set_arch_uniforms() -> void:
+	var bounds := PackedVector3Array()
+	for v in SkyRoadsCamera.ARCH_BAND_RATIOS:
+		bounds.append(v)
+	var left := PackedVector3Array()
+	var right := PackedVector3Array()
+	for i in 6:
+		var cl := _colour(SkyRoadsCamera.ARCH_RECORD_LEFT[i])
+		var cr := _colour(SkyRoadsCamera.ARCH_RECORD_RIGHT[i])
+		left.append(Vector3(cl.r, cl.g, cl.b))
+		right.append(Vector3(cr.r, cr.g, cr.b))
+	for m in _materials():
+		m.set_shader_parameter("arch_bounds", bounds)
+		m.set_shader_parameter("arch_left", left)
+		m.set_shader_parameter("arch_right", right)
 
 
 ## Paint the surface-ID map instead of the picture. Every road material is
 ## switched together — a half-switched frame would be neither.
 func set_sid_mode(on: bool) -> void:
 	var v := 1.0 if on else 0.0
-	for m in [_floor_mat, _solid_mat, _split_far_mat, _split_near_mat]:
-		if m != null:
-			m.set_shader_parameter("sid_mode", v)
-	for m in _cover_mats:
+	for m in _materials():
 		m.set_shader_parameter("sid_mode", v)

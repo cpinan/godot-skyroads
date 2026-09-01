@@ -47,6 +47,7 @@ Measured parity, as of the last verification run:
 | Backdrop vs its source art | **0 differing pixels** |
 | Roads completed end to end, in the real scene | **23 of 30** — the other 7 have no solved route yet |
 | Road geometry, RGB, rows 34..128 | **0.5% - 2.0%** of road pixels on roads 2, 5, 21 and 26 |
+| Road geometry, from inside a tunnel | **6.4%** — the worst frame in the game, and what is left of it is named |
 
 **Measure road parity in RGB, not palette indices.** Classifying to the
 nearest palette entry counts differences nobody can see: road 26's greys sit

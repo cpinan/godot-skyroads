@@ -116,6 +116,31 @@ static func cell_centre(row: int, col: int) -> Vector3:
 	return Vector3((col - 3.0) * COLUMN_WIDTH, 0.0, -float(row))
 
 
+## Where the original's six kind-4 ARCH records meet, as the radial ratio
+## (x - 160.5) / (y200 - 32) — straight lines through the lane cone's own
+## vanishing point. One triple per column cell, outermost first; the centre
+## column has a single boundary and only two records.
+##
+## Measured off `tools/dump_bands.c archlines`, which gives every span of every
+## kind-4 record: rasterise the records in paint order, read off where the
+## owner changes, and convert to the ratio. The numbers are the same to ±0.03
+## across bands dr5..dr8 and to ±0.002 across ALL EIGHT scroll phases, which is
+## what says they are radial lines in screen space rather than anything the
+## geometry does. BUGS.md §12.21; #31 called this "the sector geometry" and
+## could not recover it.
+const ARCH_BAND_RATIOS := [
+	Vector3(2.820, 2.454, 2.013),      ## column 0 / 6, records 2,3,4,5
+	Vector3(1.890, 1.571, 1.236),      ## column 1 / 5
+	Vector3(0.957, 0.687, 0.460),      ## column 2 / 4
+	Vector3(0.244, 0.0, 0.0),          ## column 3, records 1,2 only
+]
+## sr_quad rows 68..73 (ds:0x322, `tables.c`): arch record r paints palette
+## entry ARCH_RECORD_LEFT[r] on the left screen half and ARCH_RECORD_RIGHT[r]
+## on the right. The gradient is a V — 71,70,69,68,69,70 — not a ramp.
+const ARCH_RECORD_LEFT := [71, 70, 69, 68, 69, 70]
+const ARCH_RECORD_RIGHT := [70, 69, 68, 69, 70, 71]
+
+
 ## The VERTICAL twin of the cone below: how much SHORTER or taller the
 ## original draws a raised surface than this pinhole does, at `depth`.
 ##
@@ -222,12 +247,20 @@ static func make_dos_material(transparent := false, depth_always := false,
 	var code := "shader_type spatial;\nrender_mode " + modes + ";\n" + """
 varying float v_depth;
 varying float v_sid;
+varying float v_arch;
 uniform float sid_mode = 0.0;
+// the arch band fan: bounds[c] holds one column cell's boundary ratios, and
+// the two palettes are the same six records resolved through sr_quad for each
+// screen half (SkyRoadsCamera.ARCH_BAND_RATIOS / ARCH_RECORD_*)
+uniform vec3 arch_bounds[4];
+uniform vec3 arch_left[6];
+uniform vec3 arch_right[6];
 void vertex() {
 	vec4 v = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	float d = max(-v.z, 0.05);
 	v_depth = d;
 	v_sid = UV2.x;
+	v_arch = UV2.y;
 	float y200 = %f + %f / d;
 	float dos_lane = max(%f * (y200 - %f), 0.001);
 	float pin_lane = 46.0 * %f / d;
@@ -241,12 +274,32 @@ void vertex() {
 }
 void fragment() {
 %s
+	// A tunnel vault quad carries its column + 1 in UV2.y and takes its
+	// record from WHERE IT LANDS ON SCREEN, not from its own geometry: the
+	// original's six arch records are separated by fixed radial lines through
+	// the lane cone's vanishing point, and a raised surface does not project
+	// into its own column's wedge.
+	float xd = SCREEN_UV.x * 320.0;
+	float rec = -1.0;
+	if (v_arch > 0.5) {
+		float yd = SCREEN_UV.y * 200.0;
+		float m = abs(xd - 160.5) / max(yd - 32.0, 0.001);
+		int c = int(v_arch + 0.5) - 1;
+		vec3 b = arch_bounds[c > 3 ? 6 - c : c];
+		if (c == 3) {
+			rec = m > b.x ? 1.0 : 2.0;
+		} else {
+			rec = m > b.x ? 2.0 : (m > b.y ? 3.0 : (m > b.z ? 4.0 : 5.0));
+		}
+	}
 	if (sid_mode > 0.5) {
-		float sid = floor(v_sid + 0.5);
+		float sid = rec >= 0.0 ? 65.0 + rec : floor(v_sid + 0.5);
 		ALBEDO = vec3(
 			(floor(mod(sid, 8.0)) * 32.0 + 16.0) / 255.0,
 			(floor(mod(sid / 8.0, 8.0)) * 32.0 + 16.0) / 255.0,
 			(floor(mod(sid / 64.0, 4.0)) * 64.0 + 32.0) / 255.0);
+	} else if (rec >= 0.0) {
+		ALBEDO = xd < 160.5 ? arch_left[int(rec)] : arch_right[int(rec)];
 	} else {
 		ALBEDO = COLOR.rgb;
 	}

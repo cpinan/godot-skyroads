@@ -4,11 +4,10 @@ _Last updated: 2026-09-01 · git lives in `godot/` only, branch **`main`** · `c
 
 ## Next action
 
-Fix the tunnel arch — §12.20. `_tunnel` emits four bands across a column where
-the original paints six, so two of the reference's records are never drawn, and
-inside a tunnel is five times worse than anywhere else measured. It is the last
-parity item with a number on it; everything else here is green or needs a
-human.
+Decide whether the repo goes public. Every parity item with a number on it is
+closed; what is left needs a human (§1.1's live trace) or a decision. If more
+parity is wanted, the two candidates are the second rim record and the one-row
+offset, both named in §12.21 and both small.
 
 ## State
 
@@ -28,6 +27,12 @@ human.
     comparison was against the NEXT reference tick. **C's `c_tN` is the port's
     `t(N+1)`** — the golden dashboard test always paired them correctly, the
     parity recipes did not.
+  - §12.21 the SECTOR GEOMETRY, recovered — #31's missing piece. The six
+    kind-4 arch records are separated by fixed RADIAL LINES through the
+    lane cone's vanishing point, the same to ±0.002 across all eight
+    scroll phases. The old model picked the band from the slice index,
+    which is a position in the LANE, and a raised surface does not
+    project into its own lane's wedge.
   - §12.18/§12.19 the near-field defect, attributed and corrected: the
     original's vertical projection is not one pinhole. The camera reproduces
     the DECK band edges to 0.24 px and raised surfaces are on a different
@@ -87,15 +92,14 @@ tools/make_compare.py  <out>/c_t0199.ppm <out>/road21_t0200.png shot.png
 - **Seven roads have no route**: 12, 18, 20, 27, 28, 29, 30. Roads 12 and 18
   reach their LAST ROW (160.7/164 and 163.0/163) and never trigger the finish
   gate, so for those two it is the tunnel-mouth entry, not traversal.
-- **Inside a tunnel is the worst frame in the game — §12.20.** 10.2% of road
-  pixels on road 2 t=741, against 0.5-2.0% everywhere else, and the surface map
-  says all of it is arch BANDS taken for one another. `_tunnel` emits four
-  bands where the original paints six, so `tunnel.k4.4` and `k4.5` are never
-  drawn at all. That is #31, the unrecovered sector geometry, with a number
-  attached; §12.20 has the `dump_bands archlines` recipe, the measured band
-  boundaries, and the two things to settle before changing a constant.
-- **The arch was NOT double-corrected by §12.19** — that was checked: the warp
-  improves the tunnel mouth 7.7% -> 1.7% and the interior 14.3% -> 10.2%.
+- **The tunnel interior is still the worst frame**, but at 6.4% rather than
+  14.3% (road 2 t=741). What is left is the second rim record, which the port
+  does not emit because the `k4.6`/`k4.7` split is NOT radial (±0.3 to ±0.5,
+  against ±0.03 for the vault boundaries), and the same one-row offset that
+  shows everywhere else. §12.21.
+- **The arch was NOT double-corrected by §12.19** — checked before §12.21 was
+  built: the warp alone improved the mouth 7.7% -> 1.7% and the interior
+  14.3% -> 10.2%.
 - **`docs/screenshots/compare_menu.png` was not regenerated** — the menus are
   unchanged and still 0 differing pixels, so it is still true. The three road
   ones were rebuilt with `tools/make_compare.py`; the port-only gallery further

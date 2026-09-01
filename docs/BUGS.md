@@ -2152,3 +2152,82 @@ question for the port's strip model but throws away how they meet lower down.
 And a record's x extent is wider than the 46-px column the port builds an arch
 inside (ci1 spans 73 px), so the mapping from record to column is not 1:1 and
 has to be worked out before any constant is changed.
+
+### 12.21 — the sector geometry, recovered: the arch bands are radial lines
+
+§12.20 left the tunnel interior as the worst frame in the game and named the
+cause: four bands where the original paints six. #31 had called the missing
+piece "the sector geometry" and could not recover it. It is recovered, and it
+is not geometry at all.
+
+**Method.** `dump_bands archlines` gives every span of every kind-4 record.
+Rasterise the six of them in paint order into a screen buffer, per band and
+column cell, and read off where the owner changes down each scanline. Plotting
+the result makes it obvious — the boundaries are straight diagonals — and
+converting each crossing to the radial ratio `(x - 160.5) / (y200 - 32)` makes
+it certain:
+
+```
+                         phase 0   phase 2   phase 4   phase 6
+column 0  2|3              -2.820    -2.819    -2.821    -2.821
+          3|4              -2.454    -2.454    -2.454    -2.454
+          4|5              -2.013    -2.012    -2.011    -2.011
+column 1  2|3              -1.890    -1.890    -1.889    -1.889
+          3|4              -1.571    -1.570    -1.570    -1.570
+          4|5              -1.236    -1.235    -1.235    -1.235
+column 2  2|3              -0.957    -0.956    -0.956    -0.956
+          3|4              -0.687    -0.686    -0.685    -0.685
+          4|5              -0.460    -0.460    -0.459    -0.459
+column 3  1|2              -0.244    -0.243    -0.243    -0.242
+```
+
+The same to ±0.03 across bands dr4..dr8 and to **±0.002 across all eight scroll
+phases**. They are fixed radial lines through **(160.5, 32)** — the lane cone's
+own vanishing point, #28's `DOS_X_VANISH_Y`. The centre column has one
+boundary and only two records; the others have three and four.
+
+**Why the old model could not work, however the edges were chosen.** `_tunnel`
+picked the band from the SLICE INDEX within the column, which is a position in
+the lane. A radial line is a position on the SCREEN, and for a RAISED surface
+the two are not the same thing — screen x depends on world X and depth, screen
+y also on height, so the ratio moves with height along a fixed slice. It shows
+up in the numbers: column 0's outermost boundary sits at lane offset -4.23,
+which is off the road entirely. No table of slice indices can express that.
+
+**The fix.** A vault quad carries its column + 1 in `UV2.y`; the road shader
+computes the ratio per fragment and picks the record from
+`SkyRoadsCamera.ARCH_BAND_RATIOS`. Colour comes from `sr_quad` rows 68..73
+(`tables.c`), which is a V and not a ramp — `71,70,69,68,69,70` on the left
+half, mirrored on the right — so both palettes are uploaded and the fragment
+picks by which side of the centre it is on. `TUNNEL_ARCH_*` and
+`TUNNEL_BAND_EDGES_*` are gone.
+
+**Measured**, road 2 t=741, the frame from inside the vault:
+
+```
+                RGB > 16        surface ids
+before §12.19   14.3%           48.6%
+after §12.19    10.2%           44.9%
+after this       6.4%           10.2%
+```
+
+and the bands now land where the reference puts them, one row out:
+
+```
+reference                    port
+y[ 60.. 63] tunnel.k4.2      y[ 60.. 62] tunnel.k4.2
+y[ 64.. 75] tunnel.k4.3      y[ 63.. 74] tunnel.k4.3
+y[ 76.. 97] tunnel.k4.4      y[ 75.. 96] tunnel.k4.4
+y[ 98..115] tunnel.k4.5      y[ 97..116] tunnel.k4.5
+y[116..117] tunnel.k4.1      y[117..119] tunnel.k4.1
+```
+
+Roads 21, 2 and 26 are unchanged to the pixel — the fan only touches vault
+quads — so this is a tunnel fix and not a global one.
+
+**The two rims are NOT radial.** `k4.6` and `k4.7` split the mouth ring, and
+the same measurement gives -2.194 ±0.527, -1.381 ±0.408, -0.634 ±0.289 for
+columns 0..2 — an order of magnitude looser than the vault boundaries, which
+are ±0.03. Whatever separates them is not a radial line, so the port still
+emits one rim record and `k4.7` still shows up as absent. That is the honest
+remainder, along with the one-row offset above.
