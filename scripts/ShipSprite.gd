@@ -38,12 +38,19 @@ const SHADOW_Y_OFFSET := 0x10
 ## bias compromise and its measurements are in BUGS.md section 8.2 #1.
 const DEPTH_BIAS := 0.0
 
+## Painted instead of the sprite when the surface map is being captured.
+const SurfaceIds = preload("res://scripts/app/SurfaceIds.gd")
+
 var _ship: Array[Texture2D] = []
 var _explosion: Array[Texture2D] = []
 var _shadow_tex: Array[Texture2D] = []
 var _ship_rect: Sprite3D
 var _shadow_rect: Sprite3D
 var _cam: SkyRoadsCamera
+var _sid_ship: ShaderMaterial
+var _sid_shadow: ShaderMaterial
+var _normal_shadow: StandardMaterial3D
+var _sid_mode := false
 
 
 func setup(cam: SkyRoadsCamera) -> void:
@@ -74,6 +81,53 @@ func setup(cam: SkyRoadsCamera) -> void:
 
 	_ship_rect = _make_sprite()
 	add_child(_ship_rect)
+	_sid_ship = _make_sid_material(SurfaceIds.SHIP, true)
+	_sid_shadow = _make_sid_material(SurfaceIds.SHADOW, false)
+	_normal_shadow = smat
+
+
+## The ship and its shadow in the surface map: a flat record id wherever the
+## sprite would have painted, and nothing anywhere else. The shadow is a
+## MULTIPLY in the real frame — its stencil leaves white where it does not
+## darken — so its map is keyed off that white rather than off alpha.
+##
+## Sprite3D binds its texture to its own built-in material, so an override has
+## to be handed the same texture; sync() does that while the mode is on.
+func _make_sid_material(sid: int, alpha_keyed: bool) -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_test_disabled, depth_draw_never;
+uniform sampler2D sprite_tex : filter_nearest, source_color;
+uniform vec3 sid_rgb;
+uniform float alpha_keyed;
+void fragment() {
+	vec4 t = texture(sprite_tex, UV);
+	if (alpha_keyed > 0.5) {
+		if (t.a < 0.5) discard;
+	} else if (t.r > 0.9 && t.g > 0.9 && t.b > 0.9) {
+		discard;
+	}
+	ALBEDO = sid_rgb;
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	var c := SurfaceIds.encode(sid)
+	mat.set_shader_parameter("sid_rgb", Vector3(c.r, c.g, c.b))
+	mat.set_shader_parameter("alpha_keyed", 1.0 if alpha_keyed else 0.0)
+	# the ship still paints over every row and is still painted over by the
+	# cover pass, so the map has the same occlusion the picture has
+	mat.render_priority = 0 if alpha_keyed else -1
+	return mat
+
+
+## Paint record ids instead of the sprites. Kept in step with
+## RoadMesh.set_sid_mode by Main; neither is meaningful alone.
+func set_sid_mode(on: bool) -> void:
+	_sid_mode = on
+	_ship_rect.material_override = _sid_ship if on else null
+	_shadow_rect.material_override = _sid_shadow if on else _normal_shadow
 
 
 func _make_sprite() -> Sprite3D:
@@ -182,6 +236,8 @@ func sync(play: SkyRoadsPlay, on_sticky: bool, view_x: int = -1,
 	_ship_rect.visible = tex != null
 	if tex != null:
 		_ship_rect.texture = tex
+		if _sid_mode:
+			_sid_ship.set_shader_parameter("sprite_tex", tex)
 		_place(_ship_rect, left, top, SPRITE_W, SPRITE_H)
 
 	# shadow: none while exploding, none with nothing underneath, and none
@@ -209,5 +265,7 @@ func sync(play: SkyRoadsPlay, on_sticky: bool, view_x: int = -1,
 		return
 	_shadow_rect.visible = true
 	_shadow_rect.texture = _shadow_tex[map_index]
+	if _sid_mode:
+		_sid_shadow.set_shader_parameter("sprite_tex", _shadow_tex[map_index])
 	_place(_shadow_rect, left, top + SHADOW_Y_OFFSET + clearance,
 		SHADOW_W, SHADOW_H)

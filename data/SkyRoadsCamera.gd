@@ -79,6 +79,32 @@ func apply_original_framing() -> void:
 	set_frustum(size, offset, near_plane, far_plane)
 
 
+## The road does not scroll continuously in the original. render.c takes
+## `pos = z / 0x2000` — eight steps per grid row — and uses `pos & 7` to pick
+## one of EIGHT baked band tables, so the world is presented at one of eight
+## positions per row and nothing in between. The tables say so directly
+## (`tools/dump_bands.c lines`): the ship's own row occupies screen rows
+## 76..101 at phase 0 and 84..117 at phase 3, and there is no table for a
+## position between them.
+##
+## A continuous camera therefore drifts from the reference by up to an eighth
+## of a row, which is nothing at the horizon and largest in the near field,
+## where dy/dd is. Quantising is worth a little, and it is worth it on both
+## metrics — road 21 t=200 measured with the surface map and with RGB:
+##
+##     scroll quantised    sid 13.7% differ    RGB 8.6% at tol 16
+##     continuous          sid 14.1%           RGB 9.0%
+##
+## That is the whole of its effect. An earlier version of this comment claimed
+## the quantisation WAS the near-field defect of BUGS §12.14; the A/B above
+## refutes that. The defect survives it almost untouched (the misattributed
+## band goes from 1685 px to 1633), and §12.15 attributes it properly.
+const SCROLL_PHASES := 8.0
+
+static func dos_scroll_row(row: float) -> float:
+	return floor(row * SCROLL_PHASES) / SCROLL_PHASES
+
+
 ## Place the camera for a ship at `row` (fractional grid rows travelled).
 func follow(row: float) -> void:
 	position = Vector3(0.0, CAMERA_HEIGHT, -(row - BEHIND_ROWS))
@@ -150,12 +176,21 @@ static func make_dos_material(transparent := false, depth_always := false,
 		clip_src += "\n\tif (v_depth < %f) discard;" % SHIP_SPLIT_DEPTH
 	elif clip == CLIP_NEAR:
 		clip_src += "\n\tif (v_depth >= %f) discard;" % SHIP_SPLIT_DEPTH
+	# Surface-ID pass: every quad carries the id of the reference RECORD it
+	# claims to be (scripts/app/SurfaceIds.gd) in UV2.x, and when sid_mode is
+	# on the fragment paints that id instead of the palette colour. Geometry,
+	# clipping and draw order are untouched, so the map is of the frame that
+	# would otherwise have been drawn — see BUGS §12.14 for why colour cannot
+	# answer the same question.
 	var code := "shader_type spatial;\nrender_mode " + modes + ";\n" + """
 varying float v_depth;
+varying float v_sid;
+uniform float sid_mode = 0.0;
 void vertex() {
 	vec4 v = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	float d = max(-v.z, 0.05);
 	v_depth = d;
+	v_sid = UV2.x;
 	float y200 = %f + %f / d;
 	float dos_lane = max(%f * (y200 - %f), 0.001);
 	float pin_lane = 46.0 * %f / d;
@@ -164,7 +199,15 @@ void vertex() {
 }
 void fragment() {
 %s
-	ALBEDO = COLOR.rgb;
+	if (sid_mode > 0.5) {
+		float sid = floor(v_sid + 0.5);
+		ALBEDO = vec3(
+			(floor(mod(sid, 8.0)) * 32.0 + 16.0) / 255.0,
+			(floor(mod(sid / 8.0, 8.0)) * 32.0 + 16.0) / 255.0,
+			(floor(mod(sid / 64.0, 4.0)) * 64.0 + 32.0) / 255.0);
+	} else {
+		ALBEDO = COLOR.rgb;
+	}
 %s
 }
 """ % [DOS_P200, DOS_F200, DOS_LANE_PER_LINE, DOS_X_VANISH_Y, BEHIND_ROWS,

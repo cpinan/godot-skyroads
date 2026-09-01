@@ -74,6 +74,21 @@ const TUNNEL_BAND_EDGES_LEFT := [4, 29, 41]
 const TUNNEL_BAND_EDGES_MID := [11, 23, 34]
 const TUNNEL_BAND_EDGES_RIGHT := [5, 17, 42]
 
+## The surface identities both engines write into their parity buffers.
+const SurfaceIds = preload("res://scripts/app/SurfaceIds.gd")
+
+## Per-geometry record ids, in the order _block emits its quads:
+## [top, front, side, front-right-of-bore, bore interior]. A -1 means the port
+## draws nothing for that surface.
+const LOWBLOCK_SIDS := [SurfaceIds.LOWBLOCK_K2_0, SurfaceIds.LOWBLOCK_K3_0,
+	SurfaceIds.LOWBLOCK_K2_1, SurfaceIds.LOWBLOCK_K3_0, -1]
+const TUNLOW_SIDS := [SurfaceIds.TUNLOW_K2_0, SurfaceIds.TUNLOW_K3_1,
+	SurfaceIds.TUNLOW_K2_1, SurfaceIds.TUNLOW_K3_2, SurfaceIds.TUNLOW_K1_0]
+const HIBLOCK_SIDS := [SurfaceIds.HIBLOCK_K5_0, SurfaceIds.HIBLOCK_K5_2,
+	SurfaceIds.HIBLOCK_K5_1, SurfaceIds.HIBLOCK_K5_2, -1]
+const TUNHIGH_SIDS := [SurfaceIds.TUNHIGH_K5_0, SurfaceIds.TUNHIGH_K3_1,
+	SurfaceIds.TUNHIGH_K5_1, SurfaceIds.TUNHIGH_K3_2, SurfaceIds.TUNHIGH_K1_0]
+
 var _road: RoadData
 var _floors: Array[MeshInstance3D] = []      ## per grid row; null = nothing
 var _solids: Array[MeshInstance3D] = []      ## per grid row; null = nothing
@@ -254,33 +269,45 @@ func _emit_cell(floor_st: SurfaceTool, solid_st: SurfaceTool,
 		# screen half and 46..60 on the right
 		var side := _colour(surface + SIDE_EDGE_OFFSET + 15 * _half(col))
 		_quad(st, Vector3(x0, 0, z0), Vector3(x1, 0, z0),
-			Vector3(x1, 0, z1), Vector3(x0, 0, z1), top)
+			Vector3(x1, 0, z1), Vector3(x0, 0, z1), top,
+			SurfaceIds.FLOOR_K0_0)
 		# The front lip is what makes the road read as solid rather than as a
 		# painted plane, so it is drawn whenever the nearer row is empty.
 		# render.c:150 tests the nearer tile's floor NIBBLE, not the whole
 		# code: a block with no floor under it still gets a front lip
 		if row == 0 or (_road.tile(row - 1, col) & 0xF) == 0:
 			_quad(st, Vector3(x0, 0, z0), Vector3(x1, 0, z0),
-				Vector3(x1, -0.08, z0), Vector3(x0, -0.08, z0), front)
+				Vector3(x1, -0.08, z0), Vector3(x0, -0.08, z0), front,
+				SurfaceIds.FLOOR_K0_2)
 		# side edge only toward the screen centre (render.c:146-149); the DOS
 		# renderer never emits the outward-facing edge. Column 3 is composed
 		# in BOTH halves and so can carry either edge there — a per-cell
 		# colour cannot express that, so it carries neither.
 		if col < 3 and (_road.tile(row, col + 1) & 0xF) == 0:
 			_quad(st, Vector3(x1, 0, z0), Vector3(x1, 0, z1),
-				Vector3(x1, -0.08, z1), Vector3(x1, -0.08, z0), side)
+				Vector3(x1, -0.08, z1), Vector3(x1, -0.08, z0), side,
+				SurfaceIds.FLOOR_K0_1)
 		elif col > 3 and (_road.tile(row, col - 1) & 0xF) == 0:
 			_quad(st, Vector3(x0, 0, z0), Vector3(x0, 0, z1),
-				Vector3(x0, -0.08, z1), Vector3(x0, -0.08, z0), side)
+				Vector3(x0, -0.08, z1), Vector3(x0, -0.08, z0), side,
+				SurfaceIds.FLOOR_K0_1)
 
 	# anything that stands up off the deck goes in the depth-writing mesh
+	# Which reference records each of these quads claims to be. The port
+	# emits ONE front quad and one side quad per block where the reference
+	# splits both across a deck-strip band and a tier band, so the ids below
+	# name the tier's records and the comparison reports the lower band as
+	# the mismatch it is (BUGS §12.14's method, not a labelling convenience).
 	match geom:
-		2, 3:
+		2:
 			_block(solid_st, x0, x1, z0, z1, SkyRoadsCamera.HALF_BLOCK_Y,
-				code, geom == 3, col)
+				code, false, col, 0.0, LOWBLOCK_SIDS)
+		3:
+			_block(solid_st, x0, x1, z0, z1, SkyRoadsCamera.HALF_BLOCK_Y,
+				code, true, col, 0.0, TUNLOW_SIDS)
 		4:
 			_block(solid_st, x0, x1, z0, z1, SkyRoadsCamera.FULL_BLOCK_Y,
-				code, false, col)
+				code, false, col, 0.0, HIBLOCK_SIDS)
 		5:
 			# A tun_high is a FULL-HEIGHT BLOCK WITH A BORE, not a tunnel
 			# with a tier on top. The retail composer at 0x2fb0 is the kind-4
@@ -295,7 +322,7 @@ func _emit_cell(floor_st: SurfaceTool, solid_st: SurfaceTool,
 			# decoded at phase 0 / dr7 / ci1 the kind-3 pair carves 16 px of
 			# height at the lane centre and 20 px of half-width at the deck.
 			_block(solid_st, x0, x1, z0, z1, SkyRoadsCamera.FULL_BLOCK_Y,
-				code, true, col)
+				code, true, col, 0.0, TUNHIGH_SIDS)
 		1:
 			# the front wall is only drawn at the MOUTH — the original tests
 			# "nearer row's shape < 1" (composer 0x303d). Drawing it for every
@@ -309,7 +336,7 @@ func _emit_cell(floor_st: SurfaceTool, solid_st: SurfaceTool,
 ## is the tunnel arch rather than masonry.
 func _block(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 		top_y: float, code: int, bored: bool, col: int,
-		front_base_y := 0.0) -> void:
+		front_base_y := 0.0, sids := LOWBLOCK_SIDS) -> void:
 	# render.c:154-171 — the colour nibble patches the TOP (default 61); the
 	# front is always the baked 62; sides are 63 left half / 64 right half
 	var nib := SkyRoads.tile_blocktop(code)
@@ -317,7 +344,7 @@ func _block(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 	var front_c := _colour(BLOCK_FRONT_COLOUR)
 	var side_c := _colour(BLOCK_SIDE_COLOUR + _half(col))
 	_quad(st, Vector3(x0, top_y, z0), Vector3(x1, top_y, z0),
-		Vector3(x1, top_y, z1), Vector3(x0, top_y, z1), top_c)
+		Vector3(x1, top_y, z1), Vector3(x0, top_y, z1), top_c, sids[0])
 	if bored:
 		# The bore through a block is the same one the tunnels draw
 		# (ARCH_BORE_PX), so compose_tun_low can split the block's front
@@ -336,27 +363,35 @@ func _block(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 			var i1 := bore[slice + 1]
 			var sx0 := x0 + slice * px
 			var sx1 := sx0 + px
+			# the reference splits this front into a pair of records, one
+			# each side of the bore; slice 23 is the lane centre
+			var front_sid: int = sids[1] if slice < 23 else sids[3]
 			if i0 < top_y or i1 < top_y:
 				_quad(st, Vector3(sx0, top_y, z0), Vector3(sx1, top_y, z0),
-					Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), front_c)
+					Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), front_c,
+					front_sid)
 			if i0 > 0.0 or i1 > 0.0:
 				_quad(st, Vector3(sx0, i0, z1), Vector3(sx1, i1, z1),
-					Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), interior)
+					Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), interior,
+					sids[4])
 		_quad(st, Vector3(x0, top_y, z0), Vector3(x0, top_y, z1),
-			Vector3(x0, 0, z1), Vector3(x0, 0, z0), side_c)
+			Vector3(x0, 0, z1), Vector3(x0, 0, z0), side_c, sids[2])
 		_quad(st, Vector3(x1, top_y, z0), Vector3(x1, top_y, z1),
-			Vector3(x1, 0, z1), Vector3(x1, 0, z0), side_c)
+			Vector3(x1, 0, z1), Vector3(x1, 0, z0), side_c, sids[2])
 	else:
-		_face(st, x0, x1, z0, z1, top_y, front_c, side_c, front_base_y)
+		_face(st, x0, x1, z0, z1, top_y, front_c, side_c, front_base_y,
+			sids[1], sids[2])
 
 
 ## The front quad and the two side quads are separate palette entries in the
 ## original, so neither is a shaded variant of the other.
 func _face(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 		top_y: float, front_c: Color, side_c: Color,
-		front_base_y := 0.0) -> void:
+		front_base_y := 0.0, front_sid := SurfaceIds.LOWBLOCK_K3_0,
+		side_sid := SurfaceIds.LOWBLOCK_K2_1) -> void:
 	_quad(st, Vector3(x0, top_y, z0), Vector3(x1, top_y, z0),
-		Vector3(x1, front_base_y, z0), Vector3(x0, front_base_y, z0), front_c)
+		Vector3(x1, front_base_y, z0), Vector3(x0, front_base_y, z0), front_c,
+		front_sid)
 	# The sides stop where the front does. compose_tun_high still emits the
 	# LOWER side record, but it paints the six arch records over it
 	# afterwards, so what the reference actually shows below the tier is the
@@ -364,9 +399,11 @@ func _face(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 	# arch, so drawing it would win on depth and hide the tunnel — which is
 	# what made road 2's roadside tunnels look like solid grey walls.
 	_quad(st, Vector3(x0, top_y, z0), Vector3(x0, top_y, z1),
-		Vector3(x0, front_base_y, z1), Vector3(x0, front_base_y, z0), side_c)
+		Vector3(x0, front_base_y, z1), Vector3(x0, front_base_y, z0), side_c,
+		side_sid)
 	_quad(st, Vector3(x1, top_y, z0), Vector3(x1, top_y, z1),
-		Vector3(x1, front_base_y, z1), Vector3(x1, front_base_y, z0), side_c)
+		Vector3(x1, front_base_y, z1), Vector3(x1, front_base_y, z0), side_c,
+		side_sid)
 
 
 ## A tunnel, built from the profile the original DRAWS (ARCH_OUTER_PX /
@@ -431,18 +468,40 @@ func _tunnel(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 		while band < 3 and slice >= int(edges[band]):
 			band += 1
 		var c: Color = _colour(bands[band])
+		# the reference paints SIX kind-4 records across the vault where this
+		# emits four bands; the ids follow its paint order, so the two the
+		# port never emits show up as absent rather than as a colour argument
 		_quad(st, Vector3(sx0, o0, z1), Vector3(sx1, o1, z1),
-			Vector3(sx1, o1, z0), Vector3(sx0, o0, z0), c)
+			Vector3(sx1, o1, z0), Vector3(sx0, o0, z0), c,
+			SurfaceIds.TUNNEL_K4_0 + band)
 		if i0 > 0.0 or i1 > 0.0:
 			_quad(st, Vector3(sx0, i0, z1), Vector3(sx1, i1, z1),
-				Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), wall_c)
+				Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), wall_c,
+				SurfaceIds.TUNNEL_K1_0)
 		if mouth:
 			_quad(st, Vector3(sx0, o0, z0), Vector3(sx1, o1, z0),
-				Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), rim_c)
+				Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), rim_c,
+				SurfaceIds.TUNNEL_K4_6)
 
 
+## `sid` is the reference record this quad claims to be
+## (scripts/app/SurfaceIds.gd). It rides in UV2.x, which nothing else uses, so
+## the surface map costs the normal render nothing: the shader reads it only
+## when sid_mode is on.
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3,
-		col: Color) -> void:
+		col: Color, sid: int) -> void:
 	for v in [a, b, c, a, c, d]:
 		st.set_color(col)
+		st.set_uv2(Vector2(float(sid), 0.0))
 		st.add_vertex(v)
+
+
+## Paint the surface-ID map instead of the picture. Every road material is
+## switched together — a half-switched frame would be neither.
+func set_sid_mode(on: bool) -> void:
+	var v := 1.0 if on else 0.0
+	for m in [_floor_mat, _solid_mat, _split_far_mat, _split_near_mat]:
+		if m != null:
+			m.set_shader_parameter("sid_mode", v)
+	for m in _cover_mats:
+		m.set_shader_parameter("sid_mode", v)

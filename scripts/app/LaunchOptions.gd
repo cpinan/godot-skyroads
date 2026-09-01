@@ -53,6 +53,10 @@ var authentic := false
 ## Force the on-screen touch controls on a desktop build, so the mobile HUD
 ## can be driven and screenshotted without a phone.
 var force_touch := false
+## Capture a surface-ID map beside every frame: which RECORD painted each
+## pixel, in the reference's own numbering. The only way to ask which surface
+## is wrong, since a road's palette can hold exact duplicates (BUGS §12.14).
+var surface_ids := false
 
 ## Arguments that were not understood, for the caller to report.
 var unknown: Array[String] = []
@@ -123,6 +127,8 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				o.authentic = true
 			"--touch":
 				o.force_touch = true
+			"--surface-ids":
+				o.surface_ids = true
 			"--magenta-backdrop":
 				pass                  # read directly by Backdrop
 			_:

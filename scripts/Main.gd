@@ -9,6 +9,8 @@
 # this only wires them together.
 extends Node
 
+const SurfaceIds = preload("res://scripts/app/SurfaceIds.gd")
+
 var road_index := 1
 var _loop: GameLoop
 var _road: RoadData
@@ -53,6 +55,11 @@ var _autodump := false
 var _next_road := 0
 var _want_overlay := false
 var _want_labels := false
+## --surface-ids: every capture is taken twice, once as the picture and once
+## as the map of WHICH RECORD painted each pixel (scripts/app/SurfaceIds.gd)
+var _surface_ids := false
+var _backdrop: Backdrop
+var _env: Environment
 ## DEMO.REC, the 1993 attract recording. Indexed by ship Z rather than by tick
 ## (sample = z / 0x666, roughly 40 per row), which is what makes playback
 ## independent of how fast the ship happens to be going.
@@ -104,6 +111,7 @@ func _ready() -> void:
 	_autodump = opt.autodump
 	_want_overlay = opt.want_overlay
 	_want_labels = opt.want_labels
+	_surface_ids = opt.surface_ids
 	_menu_shot = opt.menu_shot
 	# A parity capture must render the reference screen and nothing else, so
 	# the touch layer stays off there even on a phone.
@@ -309,6 +317,7 @@ func _begin(index: int) -> void:
 	e.background_mode = Environment.BG_COLOR
 	e.background_color = Color(0, 0, 0)
 	env.environment = e
+	_env = e
 	_world.add_child(env)
 	_camera = SkyRoadsCamera.new()
 	_world.add_child(_camera)
@@ -317,6 +326,7 @@ func _begin(index: int) -> void:
 	var back := Backdrop.new()
 	_camera.add_child(back)
 	back.setup(_camera, load("res://data/gfx/world%d_0.png" % _road.world))
+	_backdrop = back
 	# In the 3D world so blocks can occlude it; the dashboard CanvasLayer is
 	# still drawn afterwards, which reproduces the cowl clipping for free.
 	_ship = ShipSprite.new()
@@ -455,7 +465,11 @@ func _apply_replay_input(play: SkyRoadsPlay) -> void:
 ## current tick real time has already run. Called every frame, and again with
 ## the interpolation removed just before a capture.
 func _present() -> void:
-	var row := _loop.view_row()
+	# The original scrolls the road in eighths of a grid row, not smoothly —
+	# see SkyRoadsCamera.dos_scroll_row. The ship is NOT quantised with it:
+	# render.c blits the sprite from p->x and p->y directly, and its screen
+	# row depends on altitude alone.
+	var row := SkyRoadsCamera.dos_scroll_row(_loop.view_row())
 	_camera.follow(row)
 	# The visibility window is decided from the SIMULATED row, not the
 	# presented one. render.c:356-363 takes `baserow = (z / 0x2000) >> 3`,
@@ -504,6 +518,42 @@ func _capture_pending() -> void:
 		_owed.erase(tick)
 		if _shot_every == 0:
 			print("shot tick %d -> %s" % [tick, path])
+	if _surface_ids:
+		_capture_surface_ids(tick)
+
+
+## The same frame again, with every surface painting its identity instead of
+## its colour. Taken immediately after the picture and from the same state, so
+## the two are of the same tick at the same interpolation fraction.
+##
+## Everything that is not road geometry is removed rather than left to paint
+## an id of its own: the backdrop, the dashboard band and the HUD have no
+## record in the reference, whose map simply stays at NONE wherever the
+## composer never wrote. The clear colour becomes NONE's encoding for the
+## same reason.
+func _capture_surface_ids(tick: int) -> void:
+	var hud_was := _hud.visible
+	var back_was := _backdrop.visible
+	_hud.visible = false
+	_backdrop.visible = false
+	_env.background_color = SurfaceIds.encode(SurfaceIds.NONE)
+	_road_mesh.set_sid_mode(true)
+	_ship.set_sid_mode(true)
+	_ship.sync(_loop.play, _loop.play.on_sticky != 0,
+		_loop.view_x(), _loop.view_y())
+	RenderingServer.force_draw()
+	var img := get_viewport().get_texture().get_image()
+	var path := "%s/road%02d_t%04d.sid.png" % [_shot_dir, road_index, tick]
+	if img.save_png(path) != OK:
+		push_warning("could not write %s" % path)
+	_road_mesh.set_sid_mode(false)
+	_ship.set_sid_mode(false)
+	_ship.sync(_loop.play, _loop.play.on_sticky != 0,
+		_loop.view_x(), _loop.view_y())
+	_env.background_color = Color(0, 0, 0)
+	_hud.visible = hud_was
+	_backdrop.visible = back_was
+	RenderingServer.force_draw()
 
 
 ## Screens named on the command line are opened in turn and captured.
