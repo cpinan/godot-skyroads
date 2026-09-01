@@ -1878,3 +1878,165 @@ that, and four previous camera attempts measured worse (§12.13, #29b). The
 ladder now makes the honest experiment cheap: dump `dump_bands` for the phase,
 and compare the port's row tops against the baked table row by row, for a frame
 with geometry at several depths.
+
+### 12.16 — the capture path drew the frame before the one it saved
+
+§12.15 ended on a flag that changed nothing: `--shot-alpha` 0.0, 0.25, 0.5,
+0.75 and 3.0 all produced the same PNG, md5 `2ceda940c3310195774ff2ad1ee11861`,
+while a print inside `_capture_pending` showed `view_y` moving 602 game units
+between them. The state moved and the picture did not.
+
+**Cause — `Node3D` does not talk to the rendering server when you assign a
+transform.** It puts itself on the SceneTree's pending-transform list, and that
+list is flushed *after* the idle frame's `_process` calls. `_capture_pending()`
+runs inside `_process` and calls `RenderingServer.force_draw()` there, so the
+frame the server composed was built from the PREVIOUS flush: the camera and the
+ship of the frame before. `override_alpha` + `_present()` had moved
+`SkyRoadsCamera.position` and the ship's `Sprite3D.global_position`, and neither
+had reached the server yet. Nothing about `force_draw()` was wrong; it drew
+exactly what it had been told, one frame late.
+
+The fix is `Main._flush_transforms(get_tree().root)` — a recursive
+`Node3D.force_update_transform()` — in front of every `force_draw()` on the
+capture path, the surface-ID pass included. The flag is per node rather than
+inherited, so the walk has to visit the whole subtree.
+
+**It works, and the capture is reproducible now.** Road 21 t=200, five alphas,
+five different images, and two separate runs at 0.0 byte-identical:
+
+```
+alpha   md5                                 RGB>16   sid      (rows 34..128)
+0.0     201431ce18140ece3fabfccaae79318d     9.3%     8.8%     (2690/30400)
+0.25    904bef2561a9fdbf690f8f85bc12760a     9.3%     8.7%
+0.5     e59bb9b89152390d7ba84777ec904398     9.1%     8.4%     <- best
+0.75    065e1d50e91a00b04ffdd3accd37a2b8    10.7%    10.2%
+1.0     6807cc3d9c936123702d7257f1818e05    10.3%     9.9%
+(before the fix, every one of them: 2ceda940c3310195774ff2ad1ee11861)
+```
+
+That is #29b's non-reproducibility closed at last — the same build measuring
+18.5% and 20.0% on consecutive runs was measuring whatever interpolation
+fraction the frame loop happened to hold, because the pin never took effect.
+
+**The default stays 0.0.** 0.5 wins this frame by 0.4 points of sid, which is
+one frame on one road, and §12.14 is the whole lesson about tuning on one road.
+0.0 is also the only fraction that means something — the tick the file is named
+after. Changing it needs the sweep run across several roads first.
+
+**What this did NOT explain.** The near-field defect is unchanged: the
+`tunhigh.k5.0 -> floor.k0.0` band is still 1633 pixels, the same count §12.15
+measured through the broken path, and the block top still starts at port 112
+against reference 102 at the lane centre. So it is not an interpolation
+artefact, and the ladder experiment §12.15 asks for is still the next step.
+
+**What it did explain.** The ship/road disagreement shrank: the ship rows of the
+confusion table fall from about 400 pixels to 226 (88 + 73 + 40 + 25). The
+"port's road runs one to two ticks ahead of its own ship" reading in §12.15 was
+partly this bug — the road is rebuilt from `_loop.play.z` every frame while the
+ship is placed by a transform, so a stale flush moved one and not the other.
+
+### 12.17 — every parity capture was compared against the NEXT reference tick
+
+`tools/replay_frames.c` steps the game and then writes the frame under the
+loop counter it entered the iteration with, so **`c_tN` holds the state after
+N+1 ticks**. Confirmed with its own `SR_STATE=1` print — the file labelled
+t=199 carries `z=0018474c`, which is the z the simulation reaches on tick 200
+(`sra` sim, road 21, `data/routes/road_21.bin`) — and the file's own comment
+claims the opposite ("matching the port's capture").
+
+The port names its capture after `play.tick`, the number of ticks simulated.
+So the published recipe
+
+```
+--shot-ticks 200   against   c_t0200.sid
+```
+
+compares the port's tick 200 against the reference's tick **201**. Road 21 at
+that moment is falling 8 screen rows per tick, which is exactly the "the ship
+is 8 rows high" of §12.15 — an artefact of the comparison, not of the port.
+
+Aligned properly, the same capture measures better:
+
+```
+port t=200 vs c_t0199   7.8% of surface ids differ   <- correct pairing
+port t=200 vs c_t0200   8.8%
+port t=200 vs c_t0201  12.6%
+```
+
+**The golden dashboard test was never wrong**: `render_dashboard.gd:259` reads
+the port's `tick + 1` capture for each C golden, which is the correct pairing.
+Its stated reason — "presentation carries the ship forward into the tick being
+simulated" — is not; the reason is this off-by-one. The numbers stand.
+
+The file numbering is left alone deliberately: renaming the four checked-in
+goldens means rewriting their `.import` files, and every one of those is pinned
+to `detect_3d/compress_to=0`. **The rule to remember is that C's `c_tN` is the
+port's `t(N+1)`,** and the recipes in this file and in STATUS say so now.
+
+### 12.18 — the near-field defect, attributed: raised surfaces are not on the
+### camera's pinhole at all
+
+§12.15 measured the near-field error and could not attribute it. With the tick
+alignment of §12.17 corrected and the capture of §12.16 fixed, the remaining
+error is real and it has a clean shape.
+
+**Method.** No screenshots. The retail span tables are the ground truth, so
+compare them directly against the port's own projection. For the tun_high tier
+(`seek_kind 5`, record 0 — the id `tunhigh.k5.0` the surface map reports), take
+the span that covers the lane centre x=159 in every phase and every band:
+
+```bash
+/tmp/sr_dump_bands <retail> <phase> kindlines 5 \
+  | awk -F, 'NR>1 && $3==0 && $7<=159 && $8>=159 {print $1, $6}'
+```
+
+and against it the port's own formula, which for a horizontal surface is
+exactly the DOS one — `y200 = 9.569 + 235.636 * (1 - h) / d` — with
+`h = FULL_BLOCK_Y = 0.432866` and the far edge of band `dr` at
+`d = 2.550 + 8 - dr - phase/8`.
+
+```
+        retail   port    error        retail   port    error
+dr4 p0     38    30.0    -8.0     dr7 p0     51    47.2    -3.8
+dr5 p0     41    33.6    -7.4     dr8 p0     62    62.0    -0.0
+dr6 p0     45    38.9    -6.1     dr9 p0     85    95.8   +10.8
+dr9 p1     90   103.3   +13.3     dr9 p4    109   136.8   +27.8
+dr9 p2     96   112.4   +16.4     dr9 p5    116   154.0   +38.0
+dr9 p3    102   123.3   +21.3     dr9 p6    125   176.6   +51.6
+```
+
+**Read it as an effective height.** Invert the formula on the retail numbers,
+`h_eff = 1 - (y - 9.569) * d / 235.636`, at phase 0:
+
+```
+dr4   dr5   dr6   dr7   dr8    dr9
+.210  .260  .316  .376  .433   .504      FULL_BLOCK_Y = .4329
+```
+
+The tier's apparent height climbs steadily with proximity and equals
+`FULL_BLOCK_Y` **exactly** at dr8 — the band one row nearer than the ship.
+Farther than that the original draws the tier LOWER than a pinhole would;
+nearer, higher; and in the nearest band, dr9, the pinhole runs away entirely
+(+11 rows at phase 0 to +52 at phase 6) because its far edge passes within
+1.05 units of the eye.
+
+**So the near-field defect is not a wrong row, a wrong scroll phase or a wrong
+block height.** It is the vertical twin of #28: the camera is a least-squares
+pinhole through the DECK band edges, it reproduces those to 0.24 px, and the
+original's raised surfaces are simply not on it. One camera cannot carry both,
+exactly as no camera carries both the vertical pinhole and the horizontal cone.
+
+**Do not fix this by moving the camera.** The deck is currently right; any
+change that puts the tier where the table wants it moves the deck off. The
+correction belongs where the horizontal one already lives — in
+`make_dos_material`, as a height-dependent term applied to raised vertices
+only.
+
+**The shape a correction would take.** `h_eff ≈ h * (1.375 - 0.136 d)` fits the
+phase-0 ladder to within 3%. Algebraically that is the same pinhole with height
+`0.595 h` plus a constant screen offset of `235.636 * 0.136 * h ≈ 13.9 px` per
+unit of height — one multiply and one add in the vertex shader. It is fitted to
+ONE record of ONE tile kind at ONE column, so it is a candidate, not a change:
+before shipping it, run the same ladder for the low block (kind 2), the tunnel
+tier (kind 3) and the outer columns, and check it against §12.12's outer-column
+measurements, which are probably the same effect seen in colour.

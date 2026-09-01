@@ -488,17 +488,36 @@ func _present() -> void:
 	_labels.update(_loop.play)
 
 
+## Deliver every pending 3D transform to the rendering server NOW.
+##
+## Node3D does not talk to the server when a transform is assigned: it puts
+## itself on the SceneTree's pending list, and that list is flushed AFTER the
+## idle frame's _process calls, not inside one. A capture calls force_draw()
+## from inside _process, so the frame the server draws is built from the
+## PREVIOUS flush — the camera and the ship of the frame before. That is why
+## --shot-alpha never reached the saved image: the override moved the world
+## and the picture was of the world before it moved (BUGS §12.16).
+##
+## force_update_transform() sends the notification immediately, and it has to
+## walk the subtree because the pending flag is per node, not inherited.
+static func _flush_transforms(n: Node) -> void:
+	if n is Node3D:
+		(n as Node3D).force_update_transform()
+	for c in n.get_children():
+		_flush_transforms(c)
+
+
 func _capture_pending() -> void:
 	var tick := _pending_shot
 	_pending_shot = -1
-	# Deliberately NOT rewound to the exact simulated tick, and deliberately
-	# taken after the frame's catch-up loop rather than inside it. Both were
-	# tried and both measured WORSE against the C engine on road 2 (8.0% and
-	# 8.5% of road pixels differing, against 6.5% as it stands): the
-	# reference's frame for a tick corresponds to a moment this engine
-	# reaches part-way through its own, so the interpolated, end-of-frame
-	# state is the closer match. Left here because it is the kind of thing
-	# that looks obviously wrong and is not.
+	# Taken after the frame's catch-up loop rather than inside it. The two
+	# variants were compared on road 2 (8.0% and 8.5% of road pixels differing
+	# against 6.5%), but that was measured through the capture bug of BUGS
+	# 12.16, when the saved image was the PREVIOUS frame whatever this code
+	# did, so those numbers decide nothing and are recorded only so nobody
+	# cites them. What holds now: --shot-alpha reaches the image, two runs at
+	# the same alpha are byte-identical, and the default 0.0 pins the shot to
+	# the tick it is named after.
 	# force_draw() renders a frame synchronously instead of waiting for one.
 	# Awaiting frame_post_draw deadlocks whenever the compositor has suspended
 	# the window — which on macOS is any run that is not frontmost, i.e. every
@@ -511,6 +530,7 @@ func _capture_pending() -> void:
 	if _shot_alpha >= 0.0 and _loop != null and _loop.play != null:
 		_loop.override_alpha(_shot_alpha)
 		_present()
+	_flush_transforms(get_tree().root)
 	RenderingServer.force_draw()
 	var img := get_viewport().get_texture().get_image()
 	var path := "%s/road%02d_t%04d.png" % [_shot_dir, road_index, tick]
@@ -541,6 +561,7 @@ func _capture_surface_ids(tick: int) -> void:
 	_ship.set_sid_mode(true)
 	_ship.sync(_loop.play, _loop.play.on_sticky != 0,
 		_loop.view_x(), _loop.view_y())
+	_flush_transforms(get_tree().root)
 	RenderingServer.force_draw()
 	var img := get_viewport().get_texture().get_image()
 	var path := "%s/road%02d_t%04d.sid.png" % [_shot_dir, road_index, tick]
@@ -553,6 +574,7 @@ func _capture_surface_ids(tick: int) -> void:
 	_env.background_color = Color(0, 0, 0)
 	_hud.visible = hud_was
 	_backdrop.visible = back_was
+	_flush_transforms(get_tree().root)
 	RenderingServer.force_draw()
 
 
