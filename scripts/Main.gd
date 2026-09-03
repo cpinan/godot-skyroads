@@ -262,9 +262,17 @@ func _teardown() -> void:
 	_paused = false
 	# a child of _hud, so it dies with it — but the reference must not dangle
 	_pause_menu = null
-	for n in [_menu, _world, _hud, _loop, _roadend, _touch, _editor]:
+	# The intro is in this list because it is a SCREEN like the others, and
+	# `_unhandled_input` routes to whichever screen is alive. Leaving it behind
+	# meant anything that tore down while it was still playing kept a dead
+	# intro in front of the keyboard: ESC out of a road then went to the intro
+	# instead of leaving the road. `_end_intro` frees it on the normal path,
+	# which is why nothing noticed until the editor was opened from a boot that
+	# had not been through it.
+	for n in [_menu, _world, _hud, _loop, _roadend, _touch, _editor, _intro]:
 		if n != null and is_instance_valid(n):
 			n.queue_free()
+	_intro = null
 	_editor = null
 	_menu = null
 	_roadend = null
