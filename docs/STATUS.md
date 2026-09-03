@@ -1,17 +1,24 @@
 # STATUS — SkyRoads Godot port
 
-_Last updated: 2026-09-02 · branch **`editor-and-perf`**, 9 ahead of `main`, NOT pushed · 0 uncommitted · **the repo is PUBLIC** at `cpinan/godot-skyroads` · `tools/`, `docs/`, `analysis/`, `skyroads-port/` sit outside this repo_
+_Last updated: 2026-09-02 · branch **`main`**, pushed and level with `origin` · 0 uncommitted · **the repo is PUBLIC** at `cpinan/godot-skyroads` · `tools/`, `docs/`, `analysis/`, `skyroads-port/` sit outside this repo_
 
 ## Next action
 
-Merge `editor-and-perf` into `main` and push — the full gate is green on it
-(613 checks, 92 ok, 0 failures, 23 roads replayed) and `main` is still at
-`1393c5a`, nine commits behind.
+Nothing is pending in the repo: ten commits merged to `main` and pushed, the
+full gate green (613 checks, 92 ok, 0 failures, 23 roads replayed). Pick from
+**Open questions** — the largest is the seven unrouted roads, and that wants
+`analysis/` under git first, because the work would live there.
+
+The three things in **In flight** are finished in code and need hardware, not
+a session: a controller, a thumb on the Pixel, and somebody authoring a road
+by hand.
+
+`editor-and-perf` is merged and can be deleted (`git branch -d editor-and-perf`).
 
 ## State
 
-- **Shipped: `v1.0.0` is public.** Nothing since has been released, and the
-  nine commits on this branch are in no build.
+- **Shipped: `v1.0.0` is public.** Everything since — the editor, the perf
+  pass, the shell split, the gate split — is on `main` but in **no release**.
 - **The gate is green: 613 checks, 92 ok, 0 failures.** `QUICK=1` makes every
   one of those assertions in 78 s; the 23 end-to-end replays it skips are 90%
   of the runtime and prove the whole stack still finishes a road.
