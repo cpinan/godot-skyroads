@@ -73,8 +73,13 @@ tools/frame_compare.py <out>/c_t0199.ppm <out>/road21_t0200.png --rows 34,128
 - **Nobody has authored a real level in the editor by hand.** `examples/vaults.json`
   was built through its brushes by a script; the missing undo and copy/paste
   will only be felt by someone typing.
-- **`analysis/sra/cli.py` gained `--road-json` on 2026-09-02 and `analysis/` is
-  not a git repo** — that change exists on disk only and is not backed up.
+- **`analysis/` is not a git repo, and now carries two changes made on
+  2026-09-02** — `sra solve --road-json` (what the editor's solve button
+  calls) and the fix that stops `export-godot` overwriting
+  `data/SkyRoadsCamera.gd`. Both exist on disk only. The second one matters
+  most: if an older copy of the toolkit reappears, an export silently reverts
+  the camera to the refuted fit, and the only thing that would catch it is
+  `tests/test_geometry.gd`. Putting `analysis/` under git is the real fix.
 - **The Windows build in `v1.0.0` has never been run** — no Windows machine.
 - **Seven roads have no route**: 12, 18, 20, 27, 28, 29, 30. Diagnosed in
   §12.26 as a FUEL problem, not beam width. Its own project.
