@@ -10,6 +10,20 @@
 # `--quit` is deliberately NOT passed: it exits after one frame and would skip
 # any frame-driven suite entirely.
 set -uo pipefail
+
+# QUICK=1 skips the end-to-end replays, which are 23 roads driven in REAL TIME
+# and the large majority of this script's twenty minutes. Everything else — the
+# parse pass, the pixel suites and the headless suites — still runs, so a code
+# change can be checked in a couple of minutes and the full gate kept for a
+# commit. The summary at the bottom prints where the time actually went, and a
+# QUICK run says so on its last line: it is NOT the gate, and a green one must
+# never be reported as though it were.
+QUICK="${QUICK:-0}"
+
+# Phase timings, so "the replays are most of it" stays a measurement.
+t_parse=0; t_render=0; t_suites=0; t_e2e=0
+_t0=$SECONDS
+mark() { local __n="$1"; printf -v "$__n" '%s' "$((SECONDS - _t0))"; _t0=$SECONDS; }
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 # resolve through symlinks, so tools/verify.sh -> godot/verify.sh works
 SRC="${BASH_SOURCE[0]}"
@@ -34,6 +48,7 @@ while IFS= read -r f; do
         echo "  ok   $rel"
     fi
 done < <(find "$HERE/scripts" "$HERE/tests" "$HERE/data" -name '*.gd' 2>/dev/null | sort)
+mark t_parse
 
 echo
 echo "== rendering (needs a real GPU context, so not headless) =="
@@ -117,6 +132,7 @@ if [ -e "$HERE/tests/touch_shell.gd" ]; then
     done
 fi
 
+mark t_render
 echo
 echo "== suites =="
 for t in "$HERE"/tests/test_*.gd; do
@@ -142,8 +158,13 @@ for t in "$HERE"/tests/test_*.gd; do
     fi
 done
 
+mark t_suites
 echo
 echo "== end to end (real scene, real loop, real tick rate) =="
+if [ "$QUICK" = "1" ]; then
+    echo "  --   SKIPPED (QUICK=1). 23 roads replayed in real time is most of"
+    echo "       this script's runtime; run it without QUICK before committing."
+fi
 # The suites exercise SkyRoadsPlay directly. This drives the whole stack:
 # Main.tscn -> GameLoop's fixed-step accumulator -> the simulation. It fails if
 # any of the three is broken, which unit tests on the physics alone would miss.
@@ -151,6 +172,7 @@ echo "== end to end (real scene, real loop, real tick rate) =="
 # solver could not finish are still covered field-by-field by the suites above,
 # through a deterministic probe.
 for f in "$HERE"/data/routes/road_*.bin; do
+    [ "$QUICK" = "1" ] && break
     [ -e "$f" ] || continue
     # only the plain winning routes: skip probes and named variants
     case "$f" in *_probe.bin|*_crash.bin) continue;; esac
@@ -167,6 +189,7 @@ for f in "$HERE"/data/routes/road_*.bin; do
     fi
 done
 for f in "$HERE"/data/routes/*_probe.bin; do
+    [ "$QUICK" = "1" ] && break
     [ -e "$f" ] || continue
     road=$(basename "$f" _probe.bin); road=${road#road_}
     echo "  --   road $((10#$road)) has no winning route; covered by its probe trace"
@@ -176,7 +199,8 @@ done
 # never reach a wall crash, a burning tile, a fall or an empty tank. The
 # three-way differential covers those. It needs the analysis toolkit and a C
 # compiler, so it is opt-in rather than a hard gate here.
-if [ "${THREEWAY:-0}" = "1" ]; then
+mark t_e2e
+if [ "$QUICK" != "1" ] && [ "${THREEWAY:-0}" = "1" ]; then
     echo
     echo "== the shipped levels, all three engines, many pilots =="
     # The suites replay one route per level and the differential below uses
@@ -201,5 +225,14 @@ if [ "${THREEWAY:-0}" = "1" ]; then
 fi
 
 echo
-[ $status -eq 0 ] && echo "VERIFY OK" || echo "VERIFY FAILED"
+echo "phases: parse ${t_parse}s  rendering ${t_render}s  suites ${t_suites}s  end-to-end ${t_e2e}s"
+if [ $status -ne 0 ]; then
+    echo "VERIFY FAILED"
+elif [ "$QUICK" = "1" ]; then
+    # deliberately not the words "VERIFY OK": a grep for those must not match a
+    # run that never drove a road
+    echo "QUICK OK — the end-to-end replays did NOT run. Not the gate."
+else
+    echo "VERIFY OK"
+fi
 exit $status

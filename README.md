@@ -368,9 +368,20 @@ nobody repeats them.
 ## Tests
 
 ```sh
-./verify.sh                    # 484 checks, 77 green lines
+QUICK=1 ./verify.sh            # 605 checks in ~80 s — the edit loop
+./verify.sh                    # + 23 roads driven end to end, ~20 min — the gate
 THREEWAY=1 ./verify.sh         # + C vs Python vs GDScript on real levels
 ```
+
+**`QUICK=1` runs every assertion the full gate does.** The 23 end-to-end
+replays it skips drive real scenes at the real tick rate and are worth about
+94% of the runtime — measured: 78 s against roughly twenty minutes, phases
+`parse 8s  rendering 62s  suites 8s`. They contribute no assertions of their
+own; what they prove is that the whole stack, from `Main.tscn` through
+`GameLoop`'s accumulator into the simulation, still finishes a road. So QUICK
+is for the edit loop and the full run is for a commit, and a QUICK run
+deliberately does not print the words `VERIFY OK` — a grep for those must never
+match a run that never drove a road.
 
 `verify.sh` runs three passes, because a suite run alone lies in two
 documented ways: a syntax error in an unreferenced file ships green, and a
@@ -390,6 +401,8 @@ positive `Result:` line.
 | `test_touch` | the on-screen stick: screen halves, floating origin, two thumbs at once |
 | `touch_shell` | a synthetic tap through the real input pipeline into the real scene |
 | `test_intro` | the intro's phases, durations and palette pairs, stepped tick by tick |
+| `test_editor` | the road format, the validation rules against all 31 shipped roads, undo, fill, row surgery |
+| `test_editor_shell` | the editor reached the way a person reaches it: keys through the tree, a mouse click, the play-test round trip |
 
 The pixel suites compare against **golden frames produced by the reference
 engine**, not against this port's own past output — so drift is measured

@@ -40,12 +40,19 @@ Nothing in flight. Two things are finished in code but unproven by a person:
 ## Verify
 
 ```bash
-tools/verify.sh                      # the gate, 574 checks
+QUICK=1 tools/verify.sh              # 605 checks in ~80 s — use this while editing
+tools/verify.sh                      # + the 23 end-to-end replays, ~20 min
 THREEWAY=1 tools/verify.sh           # + C vs Python vs GDScript on real levels
 ```
 
-Twenty minutes — background it. **Do not edit a source file while it runs.** A
-windowed capture steals keyboard focus.
+**`QUICK=1` runs every assertion the full gate does** and skips only the road
+replays, which are ~94% of the runtime (78 s vs ~20 min; phases print at the
+end). It prints `QUICK OK`, never `VERIFY OK`, so a grep cannot mistake one for
+the other. Run the full gate before committing.
+
+The full run is twenty minutes — background it. **Do not edit a source file
+while it runs**, and never edit `verify.sh` itself mid-run: bash reads a script
+as it executes. A windowed capture steals keyboard focus.
 
 ### Parity, end to end
 
