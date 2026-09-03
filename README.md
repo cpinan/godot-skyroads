@@ -168,15 +168,19 @@ reference at 0 differing pixels, and an eighth item would fail that.
 
 | | |
 |---|---|
-| Arrows, PgUp/PgDn, Home/End | move the cursor |
+| Arrows, PgUp/PgDn, Home/End, mouse | move the cursor; a click also paints |
 | `1`-`7` | hole, floor, tunnel, half block, half+bore, full block, full+bore |
 | `Q` `W` `E` `R` `T` `Y` | plain, sticky, ice, supplies, boost, burning |
+| `A` `M` | fill the row, or every row between the mark and the cursor / set the mark |
+| `I` `D` | insert / delete a row |
 | `[` `]` | shorter / longer (`shift` for ten rows) |
+| `U` | undo — `shift+U` redoes; sixty steps, and the header is in them too |
 | `G` `F` `O` `B` | gravity, fuel rows, oxygen seconds, backdrop world |
 | `V` | read the next problem |
 | `S` `L` | save / reload |
 | `P` | play-test it |
 | `C` | ask the solver whether it can be finished at all |
+| `H` | the key list, on a page of its own |
 
 It draws the same glyphs `sra ascii_map` prints, so a grid here and a dump
 there read against each other.
@@ -193,7 +197,8 @@ every run, so the shipped game beats the estimate.
 and not part of this repository — so it says what is missing rather than doing
 nothing. It is authoritative in one direction only: a route found is a proof,
 because it is replayed from scratch; finding none is not proof that none
-exists.
+exists. **On a failure it puts the cursor on the row the search died at**,
+which is the answer to "why not" far more often than the verdict is.
 
 Roads written by the editor go in `user://`, never next to `data/levels/`:
 those are derived from Bluemoon's `ROADS.LZS` and `LICENSE` carves them out,

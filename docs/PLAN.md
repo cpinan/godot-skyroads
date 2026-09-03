@@ -164,9 +164,31 @@ never appears on a menu. What was built against the list below:
   them, which is also how the play-test drives one: it saves first and loads
   from the FILE, so what is tested is what would ship.
 
-Not done: no undo, no copy/paste, no palette editor (a road borrows the 72
-colours of the first shipped road of its `world`), and nobody has authored a
-real level with it yet. The last one is the only one that will find the rest.
+Four more landed the same day, after the first road was authored with it and
+the gaps were obvious:
+
+- **The solver's furthest row.** `sra` prints `furthest row 34.7/60` on a
+  failure and the editor was throwing it away. It is in the message now and the
+  CURSOR JUMPS THERE, which is the answer to "why not" far more often than the
+  verdict is.
+- **Undo**, sixty steps, `U` and `shift+U`. The header travels with the grid,
+  because undoing a gravity change and undoing a brush stroke are the same
+  gesture to the person pressing the key. A fill is one step however many cells
+  it touched, and repainting a cell with what it already holds banks nothing.
+- **`I` / `D`** insert and delete a row, so the middle of a road can be
+  restructured without retyping it. Insert adds FLOOR, for the same reason `]`
+  grows with floor.
+- **`A` fills** the cursor's row, or every row between the mark (`M`) and the
+  cursor. A three-row band of ice is three keystrokes rather than twenty-one.
+
+The key list stopped fitting the status band, so `H` opens it on a page of its
+own.
+
+Still not done: no copy/paste, no palette editor (a road borrows the 72 colours
+of the first shipped road of its `world`, and every plain floor is nibble 3), no
+overview of a long road, and no reachability check between adjacent rows — that
+last one is the solver's job. It is keyboard and mouse only and unusable on a
+phone, which should be written down rather than fixed.
 
 ### The original plan
 

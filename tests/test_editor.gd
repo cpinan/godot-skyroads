@@ -34,6 +34,7 @@ func _init() -> void:
 	_shipped_roads_are_playable()
 	_round_trip()
 	await _editor_edits()
+	await _undo_and_rows()
 	_solver_verdicts()
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
@@ -279,7 +280,8 @@ func _press(ed: Node, keycode: int) -> void:
 ## and the analysis checkout, neither of which the gate may depend on.
 func _solver_verdicts() -> void:
 	var solved := Editor._verdict(
-		"road  0  g8    24 rows  SOLVED       furthest row 24.0/24  completed")
+		"road  0  g8   24 rows  SOLVED   furthest row 24.0/24  "
+		+ "completed in 484 ticks")
 	check(solved.contains("solvable"), "SOLVED reads as solvable (%s)" % solved)
 	var lost := Editor._verdict(
 		"road  0  g8    24 rows  unsolved     furthest row 11.0/24  stuck")
@@ -289,3 +291,136 @@ func _solver_verdicts() -> void:
 		"and says so is not proof that none exists (%s)" % lost)
 	check(Editor._verdict("  ").contains("python3"),
 		"silence points at the missing interpreter, not at the road")
+
+	# the row the search died on is the answer to "why not" far more often than
+	# the verdict is, so it has to survive into the message and the cursor
+	check(lost.contains("11.0"),
+		"a failure names the furthest row reached (%s)" % lost)
+	check(absf(Editor._furthest_row(
+		"road 0 g8 24 rows unsolved furthest row   34.7/60  stuck") - 34.7) < 0.01,
+		"and the row parses out of the line sra actually prints")
+	check(Editor._furthest_row("nothing useful here") < 0.0,
+		"a line without one reports -1 rather than row zero")
+	check(solved.contains("484"),
+		"a success reports the tick count it completed in (%s)" % solved)
+
+
+## Undo, the row keys and the fill. All four are the difference between a demo
+## and something a person can build a 200-row road with, and none of them is
+## covered by the model tests because they are editor state, not road format.
+func _undo_and_rows() -> void:
+	var ed := Editor.new()
+	ed.name_stem = "test_editor_undo"
+	ed.rows = 20
+	get_root().add_child(ed)
+	await process_frame
+	ed.new_road()
+	ed._undo.clear()
+	ed._redo.clear()
+
+	# --- undo a brush stroke ---
+	_press(ed, KEY_HOME)
+	for i in 6:
+		_press(ed, KEY_DOWN)
+	var before: int = ed.cells[6 * Ed.COLS + 3]
+	_press(ed, KEY_6)
+	check(ed.cells[6 * Ed.COLS + 3] != before, "painting changed the cell")
+	_press(ed, KEY_U)
+	check(ed.cells[6 * Ed.COLS + 3] == before, "and U puts it back")
+	_press(ed, KEY_U)
+	check(ed.cells[6 * Ed.COLS + 3] == before,
+		"a second U with nothing left to undo changes nothing")
+
+	# --- painting the same thing twice must not bank a step ---
+	_press(ed, KEY_6)
+	var depth: int = ed._undo.size()
+	_press(ed, KEY_6)
+	check(ed._undo.size() == depth,
+		"repainting an unchanged cell banks no undo step (%d)" % ed._undo.size())
+
+	# --- redo, and the rule that a new edit drops the forward history ---
+	var painted: int = ed.cells[6 * Ed.COLS + 3]
+	_press(ed, KEY_U)
+	_shift(ed, KEY_U)
+	check(ed.cells[6 * Ed.COLS + 3] == painted, "shift+U redoes it")
+	_press(ed, KEY_U)
+	_press(ed, KEY_3)                       # a different edit
+	check(ed._redo.is_empty(),
+		"and a new edit drops the redo history, which is now a different road")
+
+	# --- the header is undoable too: same gesture, same key ---
+	var g: int = ed.gravity
+	_press(ed, KEY_G)
+	check(ed.gravity == g + 1, "G raises gravity")
+	_press(ed, KEY_U)
+	check(ed.gravity == g, "and U puts gravity back, not just the grid")
+
+	# --- insert and delete ---
+	var rows0: int = ed.rows
+	ed._cur_row = 6
+	_press(ed, KEY_I)
+	check(ed.rows == rows0 + 1, "I inserts a row (%d)" % ed.rows)
+	check(Ed.landable(ed.cells[6 * Ed.COLS + 3]),
+		"and it is FLOOR, not a hole dropped into the middle of the road")
+	_press(ed, KEY_D)
+	check(ed.rows == rows0, "D deletes it again (%d)" % ed.rows)
+	_press(ed, KEY_U)
+	_press(ed, KEY_U)
+	check(ed.rows == rows0, "and both are undoable (%d)" % ed.rows)
+
+	# a road cannot be shortened past the spawn row
+	while ed.rows > SkyRoads.Z_START_ROW + 2:
+		_press(ed, KEY_D)
+	var floor_rows: int = ed.rows
+	_press(ed, KEY_D)
+	check(ed.rows == floor_rows,
+		"D refuses to delete the last rows out from under the spawn (%d)" % ed.rows)
+
+	# --- fill, with and without a mark ---
+	var ed2 := Editor.new()
+	ed2.rows = 20
+	get_root().add_child(ed2)
+	await process_frame
+	ed2.new_road()
+	ed2._cur_row = 8
+	_press(ed2, KEY_5)                      # half block + bore
+	_press(ed2, KEY_A)
+	var row_filled := true
+	for c in Ed.COLS:
+		row_filled = row_filled and Ed.geometry_of(ed2.cells[8 * Ed.COLS + c]) == 3
+	check(row_filled, "A fills the whole row with the current brush")
+
+	ed2._cur_row = 10
+	_press(ed2, KEY_M)
+	check(ed2._mark_row == 10, "M sets the fill mark")
+	ed2._cur_row = 13
+	_press(ed2, KEY_2)
+	_press(ed2, KEY_E)                      # plain floor, ice
+	_press(ed2, KEY_A)
+	var band := true
+	for r in range(10, 14):
+		for c in Ed.COLS:
+			band = band and Ed.effect_of(ed2.cells[r * Ed.COLS + c]) == "ice"
+	check(band, "and with a mark set it fills every row between the two")
+	_press(ed2, KEY_U)
+	check(Ed.effect_of(ed2.cells[11 * Ed.COLS + 0]) != "ice",
+		"a fill is ONE undo step, however many cells it touched")
+	# the cursor is on row 13 and the mark is on 10, so M moves it here
+	_press(ed2, KEY_M)
+	check(ed2._mark_row == 13,
+		"M on an unmarked row moves the mark to it (%d)" % ed2._mark_row)
+	_press(ed2, KEY_M)
+	check(ed2._mark_row == -1,
+		"and pressing it again on the same row clears it (%d)" % ed2._mark_row)
+
+	ed.queue_free()
+	ed2.queue_free()
+	await process_frame
+
+
+func _shift(ed: Node, keycode: int) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	ev.pressed = true
+	ev.shift_pressed = true
+	ed.handle_input(ev)

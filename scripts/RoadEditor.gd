@@ -99,6 +99,46 @@ var _palette := PackedColorArray()
 var _solver := {}
 var _solver_frames := 0
 
+## Undo. A road is rows x 7 ints — 5.6 KB for a 200-row one — so sixty states
+## cost less than one texture and there is no reason to be clever about it.
+## The header travels with the grid: undoing a gravity change and undoing a
+## brush stroke are the same gesture to the person pressing U.
+const UNDO_DEPTH := 60
+var _undo: Array = []
+var _redo: Array = []
+
+## The other end of a fill. -1 when unset, in which case a fill covers the
+## cursor's row alone.
+var _mark_row := -1
+
+## The key list, on H. It stopped fitting the status band once undo, the row
+## keys and the fill arrived, and cramming it into two 40-character lines made
+## both of them unreadable — so it moved onto a page of its own.
+var _help := false
+
+const HELP_LINES := [
+	"ROAD EDITOR",
+	"",
+	"arrows PgUp PgDn Home End  move",
+	"mouse click                move + paint",
+	"1-7  hole floor tunnel half half+bore",
+	"     full full+bore",
+	"QWERTY  plain sticky ice supplies",
+	"        boost burning",
+	"A       fill the row (or mark..cursor)",
+	"M       set / clear the fill mark",
+	"I  D    insert / delete a row",
+	"[  ]    shorter / longer  (shift: x10)",
+	"U       undo      shift+U  redo",
+	"G F O   gravity / fuel rows / oxygen s",
+	"B       backdrop world  (shift: back)",
+	"V       next problem",
+	"S  L    save / reload",
+	"P       play-test    C  ask the solver",
+	"X       cancel a running solve",
+	"H       this page    ESC  leave",
+]
+
 
 func _ready() -> void:
 	layer = 60
@@ -121,6 +161,8 @@ func _ready() -> void:
 
 ## A fresh road: floor everywhere, a tunnel across the last row to finish in.
 func new_road() -> void:
+	if not cells.is_empty():
+		_mark_undo()
 	cells = Ed.blank(rows)
 	rows = cells.size() / Ed.COLS
 	_cur_row = SkyRoads.Z_START_ROW
@@ -178,6 +220,22 @@ func handle_input(ev: InputEvent) -> void:
 			_follow()
 		KEY_SPACE:
 			_paint()
+		KEY_U:
+			if shift:
+				_redo_step()
+			else:
+				_undo_step()
+		KEY_I:
+			_insert_row()
+		KEY_D:
+			_delete_row()
+		KEY_A:
+			_fill()
+		KEY_M:
+			_toggle_mark()
+		KEY_H:
+			_help = not _help
+			_redraw()
 		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7:
 			_geom_brush = k.keycode - KEY_1
 			_paint()
@@ -190,19 +248,23 @@ func handle_input(ev: InputEvent) -> void:
 		KEY_BRACKETRIGHT:
 			_resize(rows + (10 if shift else 1))
 		KEY_G:
+			_mark_undo()
 			gravity = clampi(gravity + (-1 if shift else 1), 1, 30)
 			_message = "gravity %d (dash shows %d)" % [gravity,
 				SkyRoads.dash_gravity(gravity)]
 			_revalidate()
 		KEY_F:
+			_mark_undo()
 			fuel_rows = maxi(fuel_rows + (-10 if shift else 10), 0)
 			_message = "fuel %d rows" % fuel_rows
 			_revalidate()
 		KEY_O:
+			_mark_undo()
 			oxygen_secs = maxi(oxygen_secs + (-5 if shift else 5), 0)
 			_message = "oxygen %d s" % oxygen_secs
 			_revalidate()
 		KEY_B:
+			_mark_undo()
 			world = wrapi(world + (-1 if shift else 1), 0,
 				SkyRoads.WORLDS_COUNT)
 			_load_palette()
@@ -256,22 +318,158 @@ func _follow() -> void:
 	_redraw()
 
 
-## Apply both brushes to the cell under the cursor. The geometry goes on first
-## so the effect lands in whichever nibble the NEW geometry reads — a burning
-## floor turned into a block has to stay burning.
+## What both brushes together would make of the cell at `i`. The geometry goes
+## on first so the effect lands in whichever nibble the NEW geometry reads — a
+## burning floor turned into a block has to stay burning.
+func _brushed(i: int) -> int:
+	var geom: int = GEOM_BRUSHES[_geom_brush]
+	if geom < 0:
+		return 0                              # a hole is the whole cell
+	return Ed.set_effect(Ed.retarget_effect(cells[i], geom),
+		EFFECT_BRUSHES[_effect_brush])
+
+
+## Apply both brushes to the cell under the cursor.
 func _paint() -> void:
 	var i := _cur_row * Ed.COLS + _cur_col
 	if i < 0 or i >= cells.size():
 		return
-	var geom: int = GEOM_BRUSHES[_geom_brush]
-	var code: int = cells[i]
-	if geom < 0:
-		cells[i] = 0                          # a hole is the whole cell
-		_revalidate()
-		return
-	code = Ed.retarget_effect(code, geom)
-	cells[i] = Ed.set_effect(code, EFFECT_BRUSHES[_effect_brush])
+	var want := _brushed(i)
+	if want == cells[i]:
+		return              # nothing changed, so nothing to undo and no redraw
+	_mark_undo()
+	cells[i] = want
 	_revalidate()
+
+
+## The far end of a fill. Pressing M on the marked row clears it, so the same
+## key sets and unsets and there is nothing to remember.
+func _toggle_mark() -> void:
+	_mark_row = -1 if _mark_row == _cur_row else _cur_row
+	_message = "mark cleared" if _mark_row < 0 else "mark on row %d" % _mark_row
+	_redraw()
+
+
+## Paint every cell of the cursor's row, or of every row between the mark and
+## the cursor. One undo step for the whole thing: a fill is one action to the
+## person who pressed A, whatever it touched.
+func _fill() -> void:
+	var lo := _cur_row if _mark_row < 0 else mini(_mark_row, _cur_row)
+	var hi := _cur_row if _mark_row < 0 else maxi(_mark_row, _cur_row)
+	lo = clampi(lo, 0, rows - 1)
+	hi = clampi(hi, 0, rows - 1)
+	_mark_undo()
+	var changed := 0
+	for r in range(lo, hi + 1):
+		for c in Ed.COLS:
+			var i := r * Ed.COLS + c
+			var want := _brushed(i)
+			if want != cells[i]:
+				cells[i] = want
+				changed += 1
+	if changed == 0:
+		_undo.pop_back()        # nothing happened, so do not bank an undo step
+	_message = "filled rows %d..%d (%d cells)" % [lo, hi, changed]
+	_revalidate()
+
+
+## Insert a row of FLOOR before the cursor. Floor and not holes, for the same
+## reason _resize grows with floor: a row of nothing dropped into the middle of
+## a road is a fall, and an editor that adds one by default is fighting you.
+func _insert_row() -> void:
+	if rows >= SkyRoads.MAX_ROWS:
+		_message = "%d rows is the engine's limit" % SkyRoads.MAX_ROWS
+		_redraw()
+		return
+	_mark_undo()
+	var out := PackedInt32Array()
+	out.resize((rows + 1) * Ed.COLS)
+	for r in rows + 1:
+		for c in Ed.COLS:
+			out[r * Ed.COLS + c] = Ed.set_surface(0, Ed.PLAIN_FLOOR) \
+				if r == _cur_row else cells[(r if r < _cur_row else r - 1) * Ed.COLS + c]
+	cells = out
+	rows += 1
+	if _mark_row >= _cur_row:
+		_mark_row += 1
+	_message = "inserted row %d (%d rows)" % [_cur_row, rows]
+	_follow()
+	_revalidate()
+
+
+func _delete_row() -> void:
+	if rows <= SkyRoads.Z_START_ROW + 2:
+		_message = "a road cannot be shorter than %d rows" \
+			% (SkyRoads.Z_START_ROW + 2)
+		_redraw()
+		return
+	_mark_undo()
+	var out := PackedInt32Array()
+	out.resize((rows - 1) * Ed.COLS)
+	for r in rows - 1:
+		for c in Ed.COLS:
+			out[r * Ed.COLS + c] = cells[(r if r < _cur_row else r + 1) * Ed.COLS + c]
+	cells = out
+	rows -= 1
+	_cur_row = mini(_cur_row, rows - 1)
+	if _mark_row > _cur_row:
+		_mark_row -= 1
+	_mark_row = mini(_mark_row, rows - 1)
+	_message = "deleted a row (%d rows)" % rows
+	_follow()
+	_revalidate()
+
+
+# ----------------------------------------------------------------- undo ----
+func _state() -> Dictionary:
+	return {"cells": cells.duplicate(), "rows": rows, "gravity": gravity,
+		"fuel_rows": fuel_rows, "oxygen_secs": oxygen_secs, "world": world}
+
+
+func _restore(st: Dictionary) -> void:
+	cells = (st["cells"] as PackedInt32Array).duplicate()
+	rows = st["rows"]
+	gravity = st["gravity"]
+	fuel_rows = st["fuel_rows"]
+	oxygen_secs = st["oxygen_secs"]
+	if world != st["world"]:
+		world = st["world"]
+		_load_palette()
+	_cur_row = clampi(_cur_row, 0, rows - 1)
+	_mark_row = mini(_mark_row, rows - 1)
+	_follow()
+	_revalidate()
+
+
+## Call BEFORE a change. The redo stack is dropped, as it has to be: a new edit
+## makes everything that was ahead of it a different road.
+func _mark_undo() -> void:
+	_undo.append(_state())
+	if _undo.size() > UNDO_DEPTH:
+		_undo.pop_front()
+	_redo.clear()
+
+
+func _undo_step() -> void:
+	if _undo.is_empty():
+		_message = "nothing to undo"
+		_redraw()
+		return
+	_redo.append(_state())
+	_restore(_undo.pop_back())
+	_message = "undo — %d step(s) left" % _undo.size()
+	_redraw()
+
+
+func _redo_step() -> void:
+	if _redo.is_empty():
+		_message = "nothing to redo"
+		_redraw()
+		return
+	_undo.append(_state())
+	_restore(_redo.pop_back())
+	_message = "redo — %d step(s) left" % _redo.size()
+	_redraw()
 
 
 ## Growing adds floor rather than holes: a new row of nothing at the end of a
@@ -280,6 +478,7 @@ func _resize(new_rows: int) -> void:
 	new_rows = clampi(new_rows, SkyRoads.Z_START_ROW + 2, SkyRoads.MAX_ROWS)
 	if new_rows == rows:
 		return
+	_mark_undo()
 	var out := PackedInt32Array()
 	out.resize(new_rows * Ed.COLS)
 	for r in new_rows:
@@ -424,20 +623,60 @@ func _process(_delta: float) -> void:
 		text = out.get_as_text()
 	_solver = {}
 	_message = _verdict(text)
+	# Put the cursor where the search died. That row IS the answer to "why not"
+	# far more often than the verdict is: the first road built with this editor
+	# was unsolvable because three rows of ice ended against a wall with one
+	# open lane, and `furthest row 34.7` pointed straight at it.
+	var row := _furthest_row(text)
+	if row >= 0.0 and not text.contains("SOLVED"):
+		_cur_row = clampi(int(row), 0, rows - 1)
+		_follow()
 	print("[editor] solve: %s" % text.strip_edges())
 	_redraw()
 
 
-## The toolkit prints one line per road and the verdict is the word SOLVED.
+## The toolkit prints one line per road; the verdict is the word SOLVED, and
+## either way the line carries `furthest row N/M`.
 static func _verdict(text: String) -> String:
+	var line := _last_line(text)
+	if line.is_empty():
+		return "the solver said nothing - is python3 on PATH?"
+	if line.contains("SOLVED"):
+		var ticks := _token_before(line, "ticks")
+		return "solvable: completes in %s ticks" % ticks if not ticks.is_empty() \
+			else "solvable: a route was found and replayed"
+	var row := _furthest_row(text)
+	if row < 0.0:
+		return "no route found - a search failure, not proof none exists"
+	return "no route past row %.1f - a search failure, not proof none exists" % row
+
+
+## How far the best branch got, or -1 when the line does not say. Reported on a
+## success too, where it is simply the last row.
+static func _furthest_row(text: String) -> float:
+	var line := _last_line(text)
+	var parts := line.split(" ", false)
+	for i in parts.size():
+		# "furthest row   34.7/60"
+		if parts[i] == "furthest" and i + 2 < parts.size():
+			return String(parts[i + 2]).split("/")[0].to_float()
+	return -1.0
+
+
+static func _token_before(line: String, word: String) -> String:
+	var parts := line.split(" ", false)
+	for i in parts.size():
+		if parts[i] == word and i > 0:
+			return parts[i - 1]
+	return ""
+
+
+static func _last_line(text: String) -> String:
 	var body := text.strip_edges()
 	if body.is_empty():
-		return "the solver said nothing - is python3 on PATH?"
+		return ""
 	var lines := body.split("\n")
-	var line: String = lines[lines.size() - 1]
-	if line.contains("SOLVED"):
-		return "solvable: a route was found and replayed"
-	return "no route found (not proof that none exists)"
+	return String(lines[lines.size() - 1]).strip_edges()
 
 
 # ----------------------------------------------------------------- draw ----
@@ -446,6 +685,9 @@ func _draw_editor() -> void:
 	d.draw_rect(Rect2(Vector2.ZERO,
 		Vector2(SkyRoads.SCREEN_W, SkyRoads.SQUARE_H)), Color(0.04, 0.05, 0.07),
 		true)
+	if _help:
+		_draw_help(d)
+		return
 	_text(d, "EDIT %s" % name_stem.substr(0, 16), 2, 3, INK)
 	_right(d, "r%d/%d c%d" % [_cur_row, rows, _cur_col], 3, CURSOR)
 	_text(d, "g%d  fuel %d  oxy %ds  world %d"
@@ -461,6 +703,8 @@ func _draw_editor() -> void:
 			tag = "S%d" % r                       # where the ship spawns
 		elif r == rows - 1:
 			tag = "F%d" % r                       # the finish row
+		if r == _mark_row:
+			tag = "*" + tag                       # the far end of a fill
 		_text(d, tag, 2, int(y + 3),
 			CURSOR if r == _cur_row else DIM)
 		for c in Ed.COLS:
@@ -495,8 +739,11 @@ func _draw_status(d: Control) -> void:
 	d.draw_rect(Rect2(Vector2(0, STATUS_TOP),
 		Vector2(SkyRoads.SCREEN_W, SkyRoads.SQUARE_H - STATUS_TOP)),
 		Color(0.02, 0.02, 0.03), true)
-	_text(d, "%s / %s" % [GEOM_LABELS[_geom_brush],
-		EFFECT_LABELS[_effect_brush]], 2, 174, CURSOR)
+	var brush := "%s / %s" % [GEOM_LABELS[_geom_brush],
+		EFFECT_LABELS[_effect_brush]]
+	if _mark_row >= 0:
+		brush += "  *%d" % _mark_row
+	_text(d, brush, 2, 173, CURSOR)
 
 	if not _problems.is_empty():
 		var p: Dictionary = _problems[_problem_at]
@@ -512,13 +759,20 @@ func _draw_status(d: Control) -> void:
 		# the count of ERRORS is the number that decides whether P will play,
 		# so it is on screen even when the reader is looking at problem 4 of 6
 		_right(d, "%d err  %d/%d" % [errors, _problem_at + 1, _problems.size()],
-			174, ERR if errors > 0 else DIM)
-		_wrap(d, str(p["text"]), 2, 184, col, 2)
+			173, ERR if errors > 0 else DIM)
+		_wrap(d, str(p["text"]), 2, 183, col, 2)
 
 	if not _message.is_empty():
-		_text(d, _message.substr(0, LINE_CHARS), 2, 203, INK)
-	_text(d, "1-7 shape  QWERTY fx  [ ] rows", 2, 216, DIM)
-	_text(d, "G F O B  V problem  S/L  P play  C solve", 2, 227, DIM)
+		_wrap(d, _message, 2, 203, INK, 2)
+	_text(d, "H keys  V problem  P play  ESC exit", 2, 226, DIM)
+
+
+## The key list. Deliberately the whole screen: it is read once and then not
+## again, so there is no reason to make it share space with the grid.
+func _draw_help(d: Control) -> void:
+	for i in HELP_LINES.size():
+		var line: String = HELP_LINES[i]
+		_text(d, line, 4, 6 + i * 11, INK if i == 0 else DIM)
 
 
 ## Right-aligned at the screen edge, for the numbers that belong in a corner.
