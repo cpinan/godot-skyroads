@@ -1,15 +1,29 @@
-# The shell: menu, gameplay, replay, and optional frame capture.
+# The shell: intro, menu, gameplay, replay, and what happens between them.
 #
 #   godot --path .                          the menu
 #   godot --path . -- --road 7              straight into a road
 #   godot --path . -- --replay 1            feed road 1's solved route
 #
-# Deliberately thin. Everything that decides gameplay lives in SkyRoadsPlay,
-# everything that decides where the camera goes lives in SkyRoadsCamera, and
-# this only wires them together.
+# Deliberately thin, and kept that way by moving out what grew here because
+# this is where the nodes are:
+#
+#   scripts/app/CaptureService.gd   --shots / --surface-ids / --menu-shot
+#   scripts/app/InputDevices.gd     reading the keyboard, pad, mouse or stick
+#   scripts/PauseMenu.gd            the phone's three-row pause screen
+#
+# Everything that decides gameplay lives in SkyRoadsPlay, everything that
+# decides where the camera goes lives in SkyRoadsCamera, and this only wires
+# them together.
 extends Node
 
-const SurfaceIds = preload("res://scripts/app/SurfaceIds.gd")
+## The three pieces this shell used to hold inline. Preloaded rather than
+## reached by `class_name`, which needs a global class cache only an editor
+## scan writes — and an editor scan is what un-pins the texture `.import`
+## files (docs/STATUS.md).
+const CaptureService = preload("res://scripts/app/CaptureService.gd")
+const InputDevices = preload("res://scripts/app/InputDevices.gd")
+const PauseMenuScene = preload("res://scripts/PauseMenu.gd")
+const RoadEditorScene = preload("res://scripts/RoadEditor.gd")
 
 var road_index := 1
 var _loop: GameLoop
@@ -23,31 +37,32 @@ var _coldbg: CollisionDebug
 var _labels: CellLabels
 var _world: Node3D
 var _menu: Menu
+## The road editor (--editor). Never reachable from a menu screen: those are
+## compared against the reference at 0 differing pixels and an eighth item
+## would fail that.
+var _editor: CanvasLayer
+## The road file a custom run is driving, or "" for one of the shipped thirty.
+## Set by --level-file and by the editor's play-test.
+var _custom_level := ""
+## Where Escape and the end of a road go back to, when the editor sent us here.
+var _return_to_editor := false
+## Which file in user://levels/ the editor is working on, so a play-test can
+## reopen it on the same road.
+var _editor_stem := "custom"
 var _replay: PackedByteArray
 var _replaying := false
 var _in_game := false
 
-# frame capture
-var _shot_dir := ""
-var _shot_at: Array[int] = []
-var _shot_alpha := -1.0
+## Everything --shots / --surface-ids / --menu-shot / --roadend-shot do. Inert
+## on every interactive path.
+var _cap := CaptureService.new()
 
-## The phone's pause menu: three tappable rows in the original's 320x200 space,
-## centred. Only ever built when the touch UI is on.
-const PAUSE_MENU_ROWS := ["RESUME", "RESTART", "QUIT"]
-const PAUSE_ROW_H := 16
-const PAUSE_MENU_TOP := 78
+## The phone's pause menu. Only ever built when the touch UI is on.
 var _pause_menu: Control
-var _shot_every := 0
-var _pending_shot := -1
-var _owed: Array[int] = []
-var _menu_shot := ""
 var _cfg := Config.new()
 ## the parsed command line, kept so the replay path can ask it for a route
 var _opt := LaunchOptions.new()
 var _roadend: RoadEnd
-var _hold := 0
-var _roadend_shot := false
 var _force_final := false
 ## --record dumps the input automatically on every death, so a session can be
 ## played normally and every failure comes out as a replayable file.
@@ -55,11 +70,6 @@ var _autodump := false
 var _next_road := 0
 var _want_overlay := false
 var _want_labels := false
-## --surface-ids: every capture is taken twice, once as the picture and once
-## as the map of WHICH RECORD painted each pixel (scripts/app/SurfaceIds.gd)
-var _surface_ids := false
-var _backdrop: Backdrop
-var _env: Environment
 ## DEMO.REC, the 1993 attract recording. Indexed by ship Z rather than by tick
 ## (sample = z / 0x666, roughly 40 per row), which is what makes playback
 ## independent of how fast the ship happens to be going.
@@ -107,18 +117,13 @@ func _ready() -> void:
 		push_warning("unrecognised option %s — ignored" % u)
 	road_index = opt.road_index
 	_replaying = opt.mode == LaunchOptions.Mode.REPLAY
-	_shot_dir = opt.shot_dir
-	_shot_at = opt.shot_ticks.duplicate()
-	_owed = opt.shot_ticks.duplicate()
-	_shot_every = opt.shot_every
-	_shot_alpha = opt.shot_alpha
-	_roadend_shot = opt.roadend_shot
+	_cap.configure(opt)
+	_cap.present = _present
+	_custom_level = opt.level_path
 	_force_final = opt.force_final
 	_autodump = opt.autodump
 	_want_overlay = opt.want_overlay
 	_want_labels = opt.want_labels
-	_surface_ids = opt.surface_ids
-	_menu_shot = opt.menu_shot
 	# A parity capture must render the reference screen and nothing else, so
 	# the touch layer stays off there even on a phone.
 	# SkyRoads.is_mobile() is Android/iOS specifically, not
@@ -134,9 +139,11 @@ func _ready() -> void:
 	var start_now := opt.mode == LaunchOptions.Mode.PLAY \
 		or opt.mode == LaunchOptions.Mode.REPLAY
 
-	if start_now:
+	if opt.mode == LaunchOptions.Mode.EDITOR:
+		_open_editor(opt.editor_name)
+	elif start_now:
 		_begin(road_index)
-	elif not _menu_shot.is_empty():
+	elif not _cap.menu_shot.is_empty():
 		_open_menu()
 		_capture_menu.call_deferred()
 	else:
@@ -182,6 +189,41 @@ func _open_menu(screen: int = -1) -> void:
 	_last_menu_screen = -1
 
 
+## The road editor. It replaces whatever is on screen, exactly as _open_menu
+## does, and it is reached only from `--editor` or from coming back out of a
+## play-test.
+func _open_editor(stem := "") -> void:
+	if not stem.is_empty():
+		_editor_stem = stem
+	_teardown()
+	_custom_level = ""
+	_return_to_editor = false
+	var ed := RoadEditorScene.new()
+	ed.name_stem = _editor_stem
+	ed.play_requested.connect(_play_custom)
+	ed.closed.connect(func() -> void: _open_menu(Menu.Screen.MAIN))
+	_editor = ed
+	add_child(ed)
+
+
+## Drive the road the editor just saved. It is loaded from the FILE rather than
+## from the grid in memory, so what is play-tested is exactly what would ship —
+## the same reason the parity captures replay from disk.
+func _play_custom(path: String) -> void:
+	_custom_level = path
+	_return_to_editor = true
+	_fade_transition(_begin.bind(0))
+
+
+## Leaving a road: back to the editor if that is where it came from, and to the
+## menu screen otherwise.
+func _leave_road(screen: int) -> void:
+	if _return_to_editor:
+		_fade_transition(_open_editor.bind(""))
+	else:
+		_fade_transition(_open_menu.bind(screen))
+
+
 func _start_intro() -> void:
 	_intro = Intro.new()
 	_intro.audio = _audio
@@ -220,9 +262,10 @@ func _teardown() -> void:
 	_paused = false
 	# a child of _hud, so it dies with it — but the reference must not dangle
 	_pause_menu = null
-	for n in [_menu, _world, _hud, _loop, _roadend, _touch]:
+	for n in [_menu, _world, _hud, _loop, _roadend, _touch, _editor]:
 		if n != null and is_instance_valid(n):
 			n.queue_free()
+	_editor = null
 	_menu = null
 	_roadend = null
 	_world = null
@@ -275,7 +318,19 @@ func _fade_transition(cb: Callable, skippable := false) -> void:
 func _begin(index: int) -> void:
 	_teardown()
 	road_index = index
-	_road = RoadData.load_json("res://data/levels/road_%02d.json" % index)
+	var level := _custom_level if not _custom_level.is_empty() \
+		else _opt.level_for(index)
+	# A custom road comes from user:// and may simply not be there; RoadData
+	# asserts, and asserts are stripped from a release build, so the check has
+	# to be here rather than inside it.
+	if not FileAccess.file_exists(level):
+		push_error("no level data at %s" % level)
+		if _return_to_editor:
+			_open_editor()
+			return
+		get_tree().quit(1)
+		return
+	_road = RoadData.load_json(level)
 	if _road == null:
 		push_error("no level data for road %d" % index)
 		get_tree().quit(1)
@@ -285,31 +340,56 @@ func _begin(index: int) -> void:
 		# a random song 2..13 per road start, never repeating the current
 		# one; the attract demo keeps whatever is playing (game.c:52-58)
 		_audio.gameplay_song(index)
+	if not _load_replay_input(index):
+		return          # no route and no demo: _load_replay_input took us back
 
+	var built := _build_world()
+	_build_hud()
+	_cap.bind(index, _road_mesh, _ship, _hud, built[0], built[1])
+	_start_loop()
+	print("road %d: %d rows, gravity %d (dash shows %d), fuel %d rows, "
+		% [index, _road.rows, _road.gravity, SkyRoads.dash_gravity(_road.gravity),
+		_road.fuel_rows] + "oxygen %d s%s"
+		% [_road.oxygen_secs, "  [replay]" if _replaying else ""])
+
+
+## The input this road will be driven by, when it is not the player's.
+## Returns false when there is nothing to drive it with and the menu has
+## already been reopened — never take the whole game down for a missing
+## replay, because a route is an optional artefact and the menu is always
+## reachable.
+func _load_replay_input(index: int) -> bool:
 	_replay = PackedByteArray()
 	_demo_rec = PackedByteArray()
-	if _replaying:
-		if index == 0:
-			# the attract demo is the original's own recording, not a route
-			_demo_rec = _load_demo_rec()
-			if _demo_rec.is_empty():
-				push_warning("DEMO.REC unavailable; returning to the menu")
-				_replaying = false
-				_open_menu()
-				return
-		else:
-			var route := _opt.route_for(index)
-			var f := FileAccess.open(route, FileAccess.READ)
-			if f == null:
-				# never take the whole game down for a missing replay: a route
-				# is an optional artefact, the menu is always reachable
-				push_warning("no route recorded for road %d — back to the menu"
-					% index)
-				_replaying = false
-				_open_menu()
-				return
-			_replay = f.get_buffer(f.get_length())
+	if not _replaying:
+		return true
+	# Road 0 is the attract demo, and its input is the original's own recording
+	# rather than a route — but a CUSTOM road is loaded through index 0 too, and
+	# feeding it DEMO.REC would drive somebody else's track. Found while
+	# replaying a solved route on a road built in the editor.
+	if index == 0 and _custom_level.is_empty():
+		# the attract demo is the original's own recording, not a route
+		_demo_rec = _load_demo_rec()
+		if _demo_rec.is_empty():
+			push_warning("DEMO.REC unavailable; returning to the menu")
+			_replaying = false
+			_open_menu()
+			return false
+		return true
+	var route := _opt.route_for(index)
+	var f := FileAccess.open(route, FileAccess.READ)
+	if f == null:
+		push_warning("no route recorded for road %d — back to the menu" % index)
+		_replaying = false
+		_open_menu()
+		return false
+	_replay = f.get_buffer(f.get_length())
+	return true
 
+
+## The 3D half: road geometry, backdrop, camera, ship, collision overlay.
+## Returns [backdrop, environment], which only the capture path wants.
+func _build_world() -> Array:
 	_world = Node3D.new()
 	add_child(_world)
 	var road_mesh := RoadMesh.new()
@@ -323,7 +403,6 @@ func _begin(index: int) -> void:
 	e.background_mode = Environment.BG_COLOR
 	e.background_color = Color(0, 0, 0)
 	env.environment = e
-	_env = e
 	_world.add_child(env)
 	_camera = SkyRoadsCamera.new()
 	_world.add_child(_camera)
@@ -332,7 +411,6 @@ func _begin(index: int) -> void:
 	var back := Backdrop.new()
 	_camera.add_child(back)
 	back.setup(_camera, load("res://data/gfx/world%d_0.png" % _road.world))
-	_backdrop = back
 	# In the 3D world so blocks can occlude it; the dashboard CanvasLayer is
 	# still drawn afterwards, which reproduces the cowl clipping for free.
 	_ship = ShipSprite.new()
@@ -342,7 +420,12 @@ func _begin(index: int) -> void:
 	_world.add_child(_coldbg)
 	if _want_overlay:
 		_coldbg.toggle()
+	return [back, e]
 
+
+## The 2D half: the black band under the viewport, the dashboard art and its
+## live readouts, the touch layer, the cell labels.
+func _build_hud() -> void:
 	_hud = CanvasLayer.new()
 	add_child(_hud)
 
@@ -392,39 +475,40 @@ func _begin(index: int) -> void:
 	_dash.authentic_gravity_window = _opt.is_parity_capture()
 	_hud.add_child(_dash)
 	if _touch_ui:
-		_touch = TouchControls.new()
-		_touch.mouse_fallback = _opt.force_touch
-		_touch.on_pause = _touch_pause
-		_pause_menu = Control.new()
-		_pause_menu.position = Vector2.ZERO
-		_pause_menu.size = Vector2(SkyRoads.SCREEN_W, SkyRoads.SQUARE_H)
-		_pause_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_pause_menu.visible = false
-		_pause_menu.draw.connect(_draw_pause_menu)
-		_hud.add_child(_pause_menu)
-		add_child(_touch)
+		_build_touch_ui()
 	_labels = CellLabels.new()
 	_hud.add_child(_labels)
 	_labels.setup(_camera)
 	if _want_labels:
 		_labels.toggle()
 
+
+func _build_touch_ui() -> void:
+	_touch = TouchControls.new()
+	_touch.mouse_fallback = _opt.force_touch
+	_touch.fixed_origin = _opt.fixed_stick
+	_touch.on_pause = _touch_pause
+	var pause := PauseMenuScene.new()
+	pause.chose.connect(_on_pause_choice)
+	_pause_menu = pause
+	_hud.add_child(_pause_menu)
+	add_child(_touch)
+
+
+func _start_loop() -> void:
 	_loop = GameLoop.new()
 	add_child(_loop)
 	_loop.finished.connect(_on_finished)
 	_loop.ticked.connect(_on_tick)
 	# A capture must be of the tick it is named after, so the catch-up loop
 	# stops on those ticks instead of running past them.
-	if not _shot_dir.is_empty():
-		_loop.halt_ticks = _shot_at.duplicate()
+	if _cap.active():
+		_loop.halt_ticks = _cap.at.duplicate()
 	_loop.start(_road)
+	_cap.bind_loop(_loop)
 	if _replaying:
 		_apply_replay_input(_loop.play)
 	_in_game = true
-	print("road %d: %d rows, gravity %d (dash shows %d), fuel %d rows, "
-		% [index, _road.rows, _road.gravity, SkyRoads.dash_gravity(_road.gravity),
-		_road.fuel_rows] + "oxygen %d s%s"
-		% [_road.oxygen_secs, "  [replay]" if _replaying else ""])
 
 
 func _on_tick(play: SkyRoadsPlay, _result: int) -> void:
@@ -436,8 +520,7 @@ func _on_tick(play: SkyRoadsPlay, _result: int) -> void:
 	_audio.warn_tick(play)
 	if _replaying:
 		_apply_replay_input(play)
-	if _shot_at.has(play.tick) or (_shot_every > 0 and play.tick % _shot_every == 0):
-		_pending_shot = play.tick
+	_cap.note_tick(play.tick)
 
 
 func _load_demo_rec() -> PackedByteArray:
@@ -494,138 +577,16 @@ func _present() -> void:
 	_labels.update(_loop.play)
 
 
-## Deliver every pending 3D transform to the rendering server NOW.
-##
-## Node3D does not talk to the server when a transform is assigned: it puts
-## itself on the SceneTree's pending list, and that list is flushed AFTER the
-## idle frame's _process calls, not inside one. A capture calls force_draw()
-## from inside _process, so the frame the server draws is built from the
-## PREVIOUS flush — the camera and the ship of the frame before. That is why
-## --shot-alpha never reached the saved image: the override moved the world
-## and the picture was of the world before it moved (BUGS §12.16).
-##
-## force_update_transform() sends the notification immediately, and it has to
-## walk the subtree because the pending flag is per node, not inherited.
-static func _flush_transforms(n: Node) -> void:
-	if n is Node3D:
-		(n as Node3D).force_update_transform()
-	for c in n.get_children():
-		_flush_transforms(c)
-
-
-func _capture_pending() -> void:
-	var tick := _pending_shot
-	_pending_shot = -1
-	# Taken after the frame's catch-up loop rather than inside it. The two
-	# variants were compared on road 2 (8.0% and 8.5% of road pixels differing
-	# against 6.5%), but that was measured through the capture bug of BUGS
-	# 12.16, when the saved image was the PREVIOUS frame whatever this code
-	# did, so those numbers decide nothing and are recorded only so nobody
-	# cites them. What holds now: --shot-alpha reaches the image, two runs at
-	# the same alpha are byte-identical, and the default 0.0 pins the shot to
-	# the tick it is named after.
-	# force_draw() renders a frame synchronously instead of waiting for one.
-	# Awaiting frame_post_draw deadlocks whenever the compositor has suspended
-	# the window — which on macOS is any run that is not frontmost, i.e. every
-	# automated one.
-	# Take the shot at a REPRODUCIBLE moment inside the tick. Without this the
-	# fraction is whatever the frame that noticed the tick happened to be at,
-	# which is why the same build measured 18.5% and 20.0% on road 2 t=640 in
-	# consecutive runs — see BUGS #29b and §12.3 for the sweep that chose the
-	# default.
-	if _shot_alpha >= 0.0 and _loop != null and _loop.play != null:
-		_loop.override_alpha(_shot_alpha)
-		_present()
-	_flush_transforms(get_tree().root)
-	RenderingServer.force_draw()
-	var img := get_viewport().get_texture().get_image()
-	var path := "%s/road%02d_t%04d.png" % [_shot_dir, road_index, tick]
-	if img.save_png(path) == OK:
-		_owed.erase(tick)
-		if _shot_every == 0:
-			print("shot tick %d -> %s" % [tick, path])
-	if _surface_ids:
-		_capture_surface_ids(tick)
-
-
-## The same frame again, with every surface painting its identity instead of
-## its colour. Taken immediately after the picture and from the same state, so
-## the two are of the same tick at the same interpolation fraction.
-##
-## Everything that is not road geometry is removed rather than left to paint
-## an id of its own: the backdrop, the dashboard band and the HUD have no
-## record in the reference, whose map simply stays at NONE wherever the
-## composer never wrote. The clear colour becomes NONE's encoding for the
-## same reason.
-func _capture_surface_ids(tick: int) -> void:
-	var hud_was := _hud.visible
-	var back_was := _backdrop.visible
-	_hud.visible = false
-	_backdrop.visible = false
-	_env.background_color = SurfaceIds.encode(SurfaceIds.NONE)
-	_road_mesh.set_sid_mode(true)
-	_ship.set_sid_mode(true)
-	_ship.sync(_loop.play, _loop.play.on_sticky != 0,
-		_loop.view_x(), _loop.view_y())
-	_flush_transforms(get_tree().root)
-	RenderingServer.force_draw()
-	var img := get_viewport().get_texture().get_image()
-	var path := "%s/road%02d_t%04d.sid.png" % [_shot_dir, road_index, tick]
-	if img.save_png(path) != OK:
-		push_warning("could not write %s" % path)
-	_road_mesh.set_sid_mode(false)
-	_ship.set_sid_mode(false)
-	_ship.sync(_loop.play, _loop.play.on_sticky != 0,
-		_loop.view_x(), _loop.view_y())
-	_env.background_color = Color(0, 0, 0)
-	_hud.visible = hud_was
-	_backdrop.visible = back_was
-	_flush_transforms(get_tree().root)
-	RenderingServer.force_draw()
-
-
-## Screens named on the command line are opened in turn and captured.
-## Capture the end-of-road screen: the text sits over the final rendered
-## frame, so the world must still be on screen when this runs.
+## Everything they do is in scripts/app/CaptureService.gd.
+## The two capture entry points the shell still calls by name. Both are
+## coroutines that wait for the tree to settle and end in get_tree().quit();
+## `call_deferred` needs a method on this node, which is all these are.
 func _capture_roadend() -> void:
-	for _i in 3:
-		await get_tree().process_frame
-	RenderingServer.force_draw()
-	RenderingServer.force_draw()
-	var img := get_viewport().get_texture().get_image()
-	var tag := "final" if _roadend.final_road else "completed"
-	var path := "%s/roadend_%s.png" % [_shot_dir, tag]
-	if img.save_png(path) == OK:
-		print("roadend shot -> %s" % path)
-	get_tree().quit(0)
+	await _cap.capture_roadend(get_tree(), _roadend.final_road)
 
 
 func _capture_menu() -> void:
-	# let the tree settle: capturing straight out of _ready grabs a frame
-	# drawn before the menu's children exist, which comes out blank
-	for _i in 3:
-		await get_tree().process_frame
-	for spec in _menu_shot.split(","):
-		var parts := spec.split(":")
-		_menu.screen = int(parts[0])
-		if parts.size() > 1:
-			match _menu.screen:
-				Menu.Screen.MAIN: _menu.main_sel = int(parts[1])
-				Menu.Screen.GO: _menu.go_sel = int(parts[1])
-				Menu.Screen.SETTINGS: _menu.set_sel = int(parts[1])
-				Menu.Screen.HELP: _menu.help_page = int(parts[1])
-		# a little progress so the road-select tick marks are visible
-		for r in 30:
-			_menu.cfg.completions[r] = (r % 4)
-		_menu._show()
-		await get_tree().process_frame
-		RenderingServer.force_draw()
-		RenderingServer.force_draw()
-		var img := get_viewport().get_texture().get_image()
-		var path := "%s/menu_%s.png" % [_shot_dir, spec.replace(":", "_")]
-		if img.save_png(path) == OK:
-			print("menu shot -> %s" % path)
-	get_tree().quit(0)
+	await _cap.capture_menu(get_tree(), _menu)
 
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -634,6 +595,9 @@ func _unhandled_input(ev: InputEvent) -> void:
 		# intro's, which the original lets the player cut short.
 		if _fade_skippable and _is_confirm(ev):
 			_skip_fade()
+		return
+	if _editor != null and is_instance_valid(_editor):
+		_editor.handle_input(ev)
 		return
 	if _intro != null:
 		_intro.handle_input(ev)
@@ -652,7 +616,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 			_fade_transition(_open_menu.bind(Menu.Screen.MAIN))
 		elif _paused:
 			# the phone gets a real pause menu rather than "any tap resumes"
-			_pause_menu_tap(_touch_canvas_pos(ev as InputEventScreenTouch))
+			_pause_menu.handle_tap(ev as InputEventScreenTouch)
 	elif _in_game and ev is InputEventKey and ev.pressed and not ev.echo:
 		var key := (ev as InputEventKey).keycode
 		if _replaying and road_index == 0:
@@ -670,7 +634,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 			# (game.c:298-307)
 			_set_paused(false)
 			if key == KEY_ESCAPE:
-				_fade_transition(_open_menu.bind(Menu.Screen.GO))
+				_leave_road(Menu.Screen.GO)
 			return
 		# The developer keys are inert while frames are being captured. Every
 		# one of them either paints over the picture being measured or stalls
@@ -679,14 +643,14 @@ func _unhandled_input(ev: InputEvent) -> void:
 		# an `r` typed while the gate had focus dumped a recording at tick 15
 		# and left its toast across road 5's sky, and `render_backdrop.gd`
 		# reported 571 wrong pixels in a band the renderer had not touched.
-		if not _shot_dir.is_empty() and key != KEY_ESCAPE:
+		if _cap.active() and key != KEY_ESCAPE:
 			return
 		match key:
 			KEY_ESCAPE:
 				# result 7: back to the road select, cursor kept
 				# (game.c:312-313)
 				_replaying = false
-				_fade_transition(_open_menu.bind(Menu.Screen.GO))
+				_leave_road(Menu.Screen.GO)
 			KEY_P:
 				if not _replaying:   # the original cannot pause the demo
 					_set_paused(true)
@@ -725,64 +689,14 @@ func _process(_delta: float) -> void:
 	# the whole scene judders.
 	if _in_game and _loop != null and _loop.play != null:
 		_present()
-	if _pending_shot >= 0 and not _shot_dir.is_empty():
-		_capture_pending()
+	_cap.service(get_tree())
 	if not _in_game or _loop == null or not _loop.running or _replaying:
 		return
-	var inp := _read_device()
-	_loop.steer = inp[0]
-	_loop.accel = inp[1]
-	_loop.jump = inp[2]
-
-
-## Sample whichever device skyroads.cfg selects (0 keyboard, 1 joystick,
-## 2 mouse). The mapping itself lives in PlayerInput, which is pure and
-## tested; this only reads the hardware.
-func _read_device() -> Array:
-	match PlayerInput.effective_device(_cfg.control,
-			Input.get_connected_joypads().size(), _touch_ui):
-		PlayerInput.Device.TOUCH:
-			# the on-screen stick has already done the thresholding, in
-			# PlayerInput.from_axes, exactly as the joystick does
-			return _touch.sample() if _touch != null else [0, 0, 0]
-		PlayerInput.Device.JOYSTICK:
-			var pad: int = Input.get_connected_joypads()[0]
-			# stick or d-pad, whichever the player uses
-			var jx := Input.get_joy_axis(pad, JOY_AXIS_LEFT_X)
-			var jy := Input.get_joy_axis(pad, JOY_AXIS_LEFT_Y)
-			if Input.is_joy_button_pressed(pad, JOY_BUTTON_DPAD_LEFT):
-				jx = -1.0
-			elif Input.is_joy_button_pressed(pad, JOY_BUTTON_DPAD_RIGHT):
-				jx = 1.0
-			if Input.is_joy_button_pressed(pad, JOY_BUTTON_DPAD_UP):
-				jy = -1.0
-			elif Input.is_joy_button_pressed(pad, JOY_BUTTON_DPAD_DOWN):
-				jy = 1.0
-			var jb := Input.is_joy_button_pressed(pad, JOY_BUTTON_A) \
-				or Input.is_joy_button_pressed(pad, JOY_BUTTON_B)
-			return PlayerInput.from_axes(jx, jy, jb)
-		PlayerInput.Device.MOUSE:
-			# Offset from the centre of the view, normalised — the DOS driver
-			# read an absolute position in a calibrated box, and this is the
-			# same idea without a sensitivity constant to invent: the ship
-			# goes where the pointer is relative to the middle of the screen.
-			var vp := get_viewport().get_visible_rect().size
-			var half := vp * 0.5
-			var off := get_viewport().get_mouse_position() - half
-			var mb := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-			return PlayerInput.from_axes(
-				off.x / maxf(half.x, 1.0), off.y / maxf(half.y, 1.0), mb)
-		_:
-			return PlayerInput.from_keys(
-				Input.is_action_pressed("sr_left"),
-				Input.is_action_pressed("sr_right"),
-				Input.is_action_pressed("sr_up"),
-				Input.is_action_pressed("sr_down"),
-				Input.is_action_pressed("sr_home"),
-				Input.is_action_pressed("sr_pgup"),
-				Input.is_action_pressed("sr_end"),
-				Input.is_action_pressed("sr_pgdn"),
-				Input.is_action_pressed("sr_jump"))
+	var inp := InputDevices.sample(_cfg.control, _touch_ui, _touch,
+		get_viewport())
+	_loop.steer = inp.x
+	_loop.accel = inp.y
+	_loop.jump = inp.z
 
 
 ## Android's back gesture and the application losing focus. Both are phone
@@ -819,7 +733,7 @@ func _go_back() -> void:
 	elif _in_game:
 		_set_paused(false)
 		_replaying = false
-		_fade_transition(_open_menu.bind(Menu.Screen.GO))
+		_leave_road(Menu.Screen.GO)
 
 
 ## Any key or tap, which is what the original's fn_4137 watches for.
@@ -861,59 +775,17 @@ func _escape_event() -> InputEventKey:
 	return ev
 
 
-## The touch pause box, which is also the only "back" a phone has: tap once
-## to pause, tap it again to leave the road. That is the original's own pair
-## of behaviours (P pauses, ESC while paused quits to the road select,
+## What the phone's pause menu decided. The rows and their hit boxes are
+## PauseMenu's; what each one MEANS is the shell's, and it is the original's
+## own pair of behaviours (P pauses, ESC while paused quits to the road select,
 ## game.c:298-313) reached with one control instead of two keys.
-## A touch's position in the original's 320x240 canvas space. Same inverse the
-## touch layer uses; the pause menu lives in the same coordinates as everything
-## else drawn in the HUD.
-func _touch_canvas_pos(ev: InputEventScreenTouch) -> Vector2:
-	if _pause_menu == null:
-		return Vector2.ZERO
-	return _pause_menu.get_global_transform().affine_inverse() * ev.position
-
-
-## One row of the phone's pause menu, in the original's 320x200 space.
-func _pause_row_rect(i: int) -> Rect2:
-	var y := float(PAUSE_MENU_TOP + i * PAUSE_ROW_H)
-	return Rect2(Vector2(90.0, y * SkyRoads.PIXEL_ASPECT),
-		Vector2(140.0, float(PAUSE_ROW_H - 3) * SkyRoads.PIXEL_ASPECT))
-
-
-func _draw_pause_menu() -> void:
-	# a dim ground so the road behind cannot be mistaken for a live frame
-	_pause_menu.draw_rect(Rect2(Vector2.ZERO,
-		Vector2(SkyRoads.SCREEN_W, SkyRoads.SQUARE_H)), Color(0, 0, 0, 0.62), true)
-	for i in PAUSE_MENU_ROWS.size():
-		var r := _pause_row_rect(i)
-		_pause_menu.draw_rect(r, Color(0.83, 0.83, 0.72), false, 1.0)
-		var label: String = PAUSE_MENU_ROWS[i]
-		var x := int((SkyRoads.SCREEN_W - Text8x8.width(label)) / 2)
-		Text8x8.draw(_pause_menu, label, x, PAUSE_MENU_TOP + i * PAUSE_ROW_H + 4,
-			Color(0.83, 0.83, 0.72), SkyRoads.PIXEL_ASPECT)
-
-
-## Returns true when the tap was consumed by the pause menu.
-func _pause_menu_tap(p: Vector2) -> bool:
-	if _pause_menu == null or not _pause_menu.visible:
-		return false
-	for i in PAUSE_MENU_ROWS.size():
-		if not _pause_row_rect(i).has_point(p):
-			continue
-		match i:
-			0:
-				_set_paused(false)
-			1:
-				_set_paused(false)
-				_fade_transition(_begin.bind(road_index))
-			2:
-				_set_paused(false)
-				_fade_transition(_open_menu.bind(Menu.Screen.GO))
-		return true
-	# a tap anywhere else on the overlay does nothing: the three rows are the
-	# whole interface, and "any tap resumes" would make QUIT hard to hit
-	return true
+func _on_pause_choice(action: int) -> void:
+	_set_paused(false)
+	match action:
+		PauseMenuScene.RESTART:
+			_fade_transition(_begin.bind(road_index))
+		PauseMenuScene.QUIT:
+			_leave_road(Menu.Screen.GO)
 
 
 func _set_paused(on: bool) -> void:
@@ -921,9 +793,7 @@ func _set_paused(on: bool) -> void:
 	if _loop != null and is_instance_valid(_loop):
 		_loop.paused = on
 	if _pause_menu != null:
-		_pause_menu.visible = on
-		if on:
-			_pause_menu.queue_redraw()
+		_pause_menu.show_menu(on)
 
 
 func _touch_pause() -> void:
@@ -993,11 +863,11 @@ func _on_finished(result: int) -> void:
 		% [SkyRoads.RESULT.get(result, result), _loop.play.tick,
 		_loop.play.tick / SkyRoads.TICK_HZ, _loop.play.z >> 16, _road.rows,
 		_loop.play.fuel, _loop.play.oxy])
-	if not _shot_dir.is_empty() and not _owed.is_empty():
+	if _cap.active() and not _cap.owed.is_empty():
 		push_error("%d screenshot(s) never taken: %s — the window was starved "
-			% [_owed.size(), _owed] + "of frames (occluded on macOS)")
-	if _replaying and not _roadend_shot:
-		if _shot_dir.is_empty() and road_index == 0:
+			% [_cap.owed.size(), _cap.owed] + "of frames (occluded on macOS)")
+	if _replaying and not _cap.roadend_shot:
+		if not _cap.active() and road_index == 0:
 			# A demo that ran to its end goes back to the INTRO, not to the
 			# menu: main @0x0385 jumps to 0x219, which is the `fn_4575()`
 			# call. Intro, demo, intro, demo — an arcade attract loop, and
@@ -1029,10 +899,9 @@ func _on_finished(result: int) -> void:
 		# (game.c:359-363)
 		_roadend.dismissed.connect(func() -> void:
 			var final := _roadend.final_road
-			_fade_transition(_open_menu.bind(
-				Menu.Screen.MAIN if final else Menu.Screen.GO)))
+			_leave_road(Menu.Screen.MAIN if final else Menu.Screen.GO))
 		add_child(_roadend)
-		if _roadend_shot:
+		if _cap.roadend_shot:
 			_capture_roadend.call_deferred()
 	else:
 		if not _loop.recording.is_empty() and _autodump:
@@ -1041,7 +910,7 @@ func _on_finished(result: int) -> void:
 		# original has no defeat screen, but it does fade out and in around
 		# the restart (game.c:356). Screenshot runs skip the fade so capture
 		# ticks stay deterministic.
-		if _shot_dir.is_empty():
-			_fade_transition(_begin.bind(road_index))
-		else:
+		if _cap.active():
 			_begin(road_index)
+		else:
+			_fade_transition(_begin.bind(road_index))

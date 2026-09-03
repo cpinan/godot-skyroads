@@ -16,6 +16,7 @@ enum Mode {
 	PLAY,        ## --road N: straight into a road
 	REPLAY,      ## --replay N: drive a road from a recorded route
 	MENU_SHOT,   ## --menu-shot: capture menu screens and exit
+	EDITOR,      ## --editor: the road editor, which is not on any menu
 }
 
 ## The interpolation fraction a parity capture is taken at: 0.0 is the state
@@ -39,6 +40,14 @@ var roadend_shot := false
 var force_final := false
 var menu_shot := ""
 
+## The road editor. Not reachable from a menu — see scripts/RoadEditor.gd for
+## why — so the flag is the whole of its front door.
+var editor_name := "custom"
+## Play a road from an arbitrary JSON instead of `data/levels/road_NN.json`.
+## What the editor's play-test uses, and what makes a user:// road drivable
+## without pretending to be one of the shipped thirty.
+var level_path := ""
+
 ## Replay input.
 var route_path := ""          ## an explicit file, absolute or res://
 var route_suffix := ""        ## a named variant: --route crash -> _crash
@@ -53,6 +62,11 @@ var authentic := false
 ## Force the on-screen touch controls on a desktop build, so the mobile HUD
 ## can be driven and screenshotted without a phone.
 var force_touch := false
+## Anchor the thumbstick to its drawn circle instead of letting it follow the
+## thumb that starts the touch. A flag rather than a setting because which one
+## is better has not been decided on hardware yet (docs/PLAN.md item 1), and a
+## flag can be A/B'd in one session without changing the cfg format.
+var fixed_stick := false
 ## Capture a surface-ID map beside every frame: which RECORD painted each
 ## pixel, in the reference's own numbering. The only way to ask which surface
 ## is wrong, since a road's palette can hold exact duplicates (BUGS §12.14).
@@ -127,8 +141,19 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				o.authentic = true
 			"--touch":
 				o.force_touch = true
+			"--fixed-stick":
+				o.fixed_stick = true
 			"--surface-ids":
 				o.surface_ids = true
+			"--editor":
+				o.mode = Mode.EDITOR
+				if not value.is_empty():
+					o.editor_name = value
+					consumed = true
+			"--level-file":
+				if not value.is_empty():
+					o.level_path = value
+					consumed = true
 			"--magenta-backdrop":
 				pass                  # read directly by Backdrop
 			_:
@@ -136,6 +161,14 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.unknown.append(arg)
 		i += 2 if consumed else 1
 	return o
+
+
+## Which file holds the road for `index`. An explicit --level-file wins, which
+## is how a road in user:// is played; otherwise it is the shipped one.
+func level_for(index: int) -> String:
+	if not level_path.is_empty():
+		return level_path
+	return "res://data/levels/road_%02d.json" % index
 
 
 ## Where this run's replay input comes from. An explicit --route-file wins;
@@ -147,6 +180,9 @@ func route_for(index: int) -> String:
 
 
 ## True when the run is automated and must not fade, wait, or play the intro.
+## The editor is not automated in that sense — a person is driving it — but it
+## does replace the intro, so it is listed here rather than left to fall
+## through to "boot normally".
 func is_automated() -> bool:
 	return mode != Mode.MENU
 

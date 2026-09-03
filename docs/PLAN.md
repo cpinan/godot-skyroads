@@ -4,7 +4,8 @@ Everything in `BUGS.md` is about making this port agree with 1993. This file is
 the opposite: four things the original never did, wanted by the person who
 commissioned the port, listed 2026-09-01.
 
-Nothing here is started. The order below is a recommendation, not a schedule —
+Item 1 is part-done and item 4 is BUILT, both 2026-09-02 and both saying so
+inline; 2 and 3 are untouched. The order below is a recommendation, not a schedule —
 each item says what it costs and what it puts at risk, because three of the
 four touch the projection or the input path, which is where every hard-won
 number in `BUGS.md` lives.
@@ -34,15 +35,29 @@ feed `PlayerInput.from_axes`, the same function the joystick and mouse devices
 use, so the simulation receives the same three integers it always did.
 
 Worth doing:
-- A real gamepad pass. `Main._read_device` reads `JOY_AXIS_LEFT_X/Y` and the
-  d-pad, but no controller has ever been plugged in. Deadzone, whether the
-  stick should be analogue at all (the simulation takes -1/0/+1, so it is a
-  threshold either way), and what the face buttons should do.
+- ~~A real gamepad pass.~~ **Done 2026-09-02.** Device sampling moved out of
+  `Main` into `scripts/app/InputDevices.gd`, and the pad path grew what a
+  modern controller needs: a `PAD_NOISE_FLOOR` of 0.12 below which an axis is
+  not moving at all (a resting stick reports a few hundredths on both axes, and
+  the simulation only sees -1/0/+1, so without a floor a worn stick steers
+  slowly and for ever), the d-pad overriding the stick rather than being summed
+  with it, and A/B/X/Y, both shoulders and both analogue triggers all jumping —
+  the original's joystick had two buttons and either of them jumped, a modern
+  pad has eight, and a player who presses the wrong one reads it as the pad not
+  working. **Still unplayed: no controller has been plugged in.**
 - Tune `STICK_RANGE` and `DEADZONE` against actual play rather than against the
-  reasoning in the comment.
-- Consider a fixed-origin stick as an option. The origin currently follows the
-  thumb that starts the touch, which is right for a thumb that wanders and
-  wrong for one that expects a fixed pad.
+  reasoning in the comment. **Not done — this one needs a human and a phone.**
+- ~~Consider a fixed-origin stick as an option.~~ **Done 2026-09-02:**
+  `--fixed-stick` sets `TouchControls.fixed_origin`, which anchors the stick to
+  its drawn circle instead of to the thumb that starts the touch. A flag rather
+  than a setting, because which one should be the DEFAULT is the open question
+  and a flag can be A/B'd in one session without changing the cfg format.
+  Covered by `tests/test_touch.gd`, which asserts the two modes differ on the
+  same gesture.
+
+**What is left of this item is the part only a person can do**: play both stick
+modes on the Pixel, with and without a pad, and say which should ship. The code
+to try them is in; the answer is not.
 
 Risk: none to parity. `PlayerInput` is pure and tested; changing thresholds
 cannot change what the simulation does with a given input, only which input a
@@ -114,7 +129,46 @@ measured worse.
 
 ---
 
-## 4. Level editor
+## 4. Level editor — BUILT 2026-09-02
+
+`--editor NAME` (`scripts/RoadEditor.gd`, `scripts/model/RoadEditModel.gd`),
+covered by `tests/test_editor.gd`. It is reached by that flag and by nothing
+else: the seven menu screens are compared against the reference at 0 differing
+pixels and an eighth item would fail `tests/render_menu.gd`, so the editor
+never appears on a menu. What was built against the list below:
+
+- **The grid**, in the game's own 320x240 canvas, drawing the same glyphs
+  `sra ascii_map` prints so the two read against each other. Shape and effect
+  are separate brushes, and the effect is written into whichever nibble the
+  SHAPE reads — blocktop for a block, surface for a floor — which is the one
+  trap the format sets for a grid editor.
+- **Live validation**, and it is the reason the rest is worth having.
+  Structural faults are ERRORS and `P` refuses to play: no tunnel in the last
+  row to finish in, a hole under the spawn, geometry above 5 (the composer
+  sends it to a return, so it is invisible AND has no collision), a gap row
+  with gravity at or above 20 where the ship cannot jump at all.
+  **Fuel and oxygen are WARNINGS, never errors** — the arithmetic below said
+  roads 14 and 28 are 9 and 6 rows longer than their tank with no supply tile
+  anywhere, and road 14 is replayed to completion by the gate on every run, so
+  the estimate is first-order and the shipped game beats it. That demotion was
+  forced by `tests/test_editor.gd`, which runs every rule against all 31
+  shipped roads and fails if any of them is called broken.
+- **The solver button** (`C`). `sra solve` grew a `--road-json` option —
+  building a `Road` from an exported JSON needs no retail data — and the editor
+  runs it as a separate process, polled from `_process`, so a long search does
+  not freeze the grid. `analysis/` is a sibling checkout, so an exported build
+  will not have it and the button says exactly that rather than doing nothing.
+  Its verdict wording is asserted: a route found is a proof, finding none is
+  reported as "no route found (not proof that none exists)".
+- **`user://levels/`**, never `res://data/levels/`. `--level-file` plays any of
+  them, which is also how the play-test drives one: it saves first and loads
+  from the FILE, so what is tested is what would ship.
+
+Not done: no undo, no copy/paste, no palette editor (a road borrows the 72
+colours of the first shipped road of its `world`), and nobody has authored a
+real level with it yet. The last one is the only one that will find the rest.
+
+### The original plan
 
 The most self-contained of the four: it touches no camera, no simulation and no
 parity path, and it can be built without opening any of them.

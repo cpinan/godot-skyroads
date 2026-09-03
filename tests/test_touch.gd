@@ -84,8 +84,44 @@ func _init() -> void:
 
 	tc.queue_free()
 	await process_frame
+	await _fixed_origin_stick()
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
+
+
+## --fixed-stick: the origin is the drawn circle, not the thumb.
+##
+## The two modes have to differ on the SAME gesture or the flag does nothing,
+## so this presses in exactly the place the floating stick treats as neutral
+## (60, 200) and requires a deflection out of it. STICK_CENTRE is (40, 196),
+## so that press is 20 px right of the anchor — past PlayerInput.DEADZONE at
+## STICK_RANGE 27, and the ship should already be turning.
+func _fixed_origin_stick() -> void:
+	var tc := TouchControls.new()
+	tc.fixed_origin = true
+	get_root().add_child(tc)
+	await process_frame
+
+	_touch(tc, Vector2(60, 200), true)
+	check(tc.sample()[0] == 1,
+		"a fixed stick steers from where the thumb lands (%s)" % [tc.sample()])
+	_touch(tc, Vector2(60, 200), false)
+	check(tc.sample() == [0, 0, 0], "and still recentres on release")
+
+	# and the flag must not leak: the same gesture on a floating stick is
+	# neutral, which is the check at the top of _init and is asserted again
+	# here so the two live side by side
+	var floating := TouchControls.new()
+	get_root().add_child(floating)
+	await process_frame
+	_touch(floating, Vector2(60, 200), true)
+	check(floating.sample() == [0, 0, 0],
+		"a floating stick treats the same press as neutral")
+	_touch(floating, Vector2(60, 200), false)
+
+	tc.queue_free()
+	floating.queue_free()
+	await process_frame
 
 
 ## The handlers take window coordinates, the same as a real event; the tests

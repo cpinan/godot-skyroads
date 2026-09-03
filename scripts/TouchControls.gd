@@ -16,7 +16,10 @@
 #     where the thumbs belong, nothing more.
 #   * The stick's origin follows the touch that started it (a "floating"
 #     stick). Anchoring it to the drawn circle means the first few pixels of
-#     every drag are spent travelling to the anchor.
+#     every drag are spent travelling to the anchor — but a thumb that expects
+#     a fixed pad finds a floating one unpredictable, so `fixed_origin`
+#     (--fixed-stick) offers the other behaviour. Which should be the default
+#     is a question for a device, not for this comment: docs/PLAN.md item 1.
 #   * Both sit over the dashboard band rather than the road: rows 129..199 of
 #     the original screen are static art, so covering part of it costs the
 #     player nothing they were reading at 36 Hz.
@@ -54,6 +57,12 @@ var _stick_pos := STICK_CENTRE
 ## desktop without turning on Godot's global mouse-to-touch emulation (which
 ## would also reach the mouse control device and the menus).
 var mouse_fallback := false
+## Anchor the stick to STICK_CENTRE rather than to the thumb that starts the
+## touch. Deflection is then measured from the drawn circle, so a thumb landing
+## at the edge of the left half steers immediately — which is the point of a
+## fixed pad, and the reason it is not the default until someone has played
+## both on hardware.
+var fixed_origin := false
 
 var _draw_node: Control
 
@@ -126,7 +135,7 @@ func _touch(index: int, screen_pos: Vector2, pressed: bool) -> void:
 	if p.x < SkyRoads.SCREEN_W * 0.5:
 		if _stick_touch < 0:
 			_stick_touch = index
-			_stick_origin = p
+			_stick_origin = STICK_CENTRE if fixed_origin else p
 			_stick_pos = p
 			_draw_node.queue_redraw()
 	else:

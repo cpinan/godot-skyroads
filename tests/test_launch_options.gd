@@ -101,6 +101,10 @@ func _init() -> void:
 		"--touch asks for the on-screen controls")
 	check(not _p(["--road", "2"]).force_touch,
 		"and is off by default, so a desktop build has no touch layer")
+	check(_p(["--touch", "--fixed-stick"]).fixed_stick,
+		"--fixed-stick anchors the thumbstick to its drawn circle")
+	check(not _p(["--touch"]).fixed_stick,
+		"and the stick floats by default, which is what shipped")
 
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)

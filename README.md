@@ -137,6 +137,7 @@ data — see [Game data](#game-data) below.
 godot --path .                            # intro, menu, play
 godot --path . -- --road 7                # straight into road 7
 godot --headless --path . -- --replay 1   # replay road 1's solved route
+godot --path . -- --editor mytrack        # the road editor
 ```
 
 **Controls** follow the original, including its four diagonal keys — one key
@@ -153,7 +154,55 @@ simultaneous presses:
 | `F2` or `R` | dump a replayable recording of this run |
 
 Joystick and mouse are selectable on the settings screen, as in the original,
-which also marks the setting currently in force in orange.
+which also marks the setting currently in force in orange. A gamepad reads the
+left stick or the d-pad, and A/B/X/Y, either shoulder and either trigger all
+jump — the 1993 joystick had two buttons and either of them jumped.
+
+---
+
+## Making a road
+
+`--editor NAME` opens a grid editor on `user://levels/NAME.json`. It is not on
+any menu, and deliberately: the seven menu screens are compared against the
+reference at 0 differing pixels, and an eighth item would fail that.
+
+| | |
+|---|---|
+| Arrows, PgUp/PgDn, Home/End | move the cursor |
+| `1`-`7` | hole, floor, tunnel, half block, half+bore, full block, full+bore |
+| `Q` `W` `E` `R` `T` `Y` | plain, sticky, ice, supplies, boost, burning |
+| `[` `]` | shorter / longer (`shift` for ten rows) |
+| `G` `F` `O` `B` | gravity, fuel rows, oxygen seconds, backdrop world |
+| `V` | read the next problem |
+| `S` `L` | save / reload |
+| `P` | play-test it |
+| `C` | ask the solver whether it can be finished at all |
+
+It draws the same glyphs `sra ascii_map` prints, so a grid here and a dump
+there read against each other.
+
+**It validates as you type, because the format lets you build roads nobody can
+finish.** Structural faults — no tunnel in the last row to finish in, a hole
+under the spawn, a gap with gravity at 20 where the ship cannot jump — are
+errors, and `P` refuses to play. Fuel and oxygen budgets are warnings and
+never errors: the arithmetic says roads 14 and 28 are longer than their tank
+with no supply tile, and road 14 is replayed to completion by the gate on
+every run, so the shipped game beats the estimate.
+
+`C` shells out to the analysis toolkit next door, which is a separate checkout
+and not part of this repository — so it says what is missing rather than doing
+nothing. It is authoritative in one direction only: a route found is a proof,
+because it is replayed from scratch; finding none is not proof that none
+exists.
+
+Roads written by the editor go in `user://`, never next to `data/levels/`:
+those are derived from Bluemoon's `ROADS.LZS` and `LICENSE` carves them out,
+while a road you build is your own work. Any of them can be driven directly
+with `--road 0 --level-file user://levels/NAME.json`.
+
+`examples/vaults.json` is one built this way, with a solved route beside it.
+Its first draft was unsolvable and the solver said where: row 34.7, three rows
+of ice ending against a wall with one open lane. See `examples/README.md`.
 
 ---
 
@@ -354,11 +403,14 @@ broken, the tests are confirmed to fail, and the break is reverted.
 
 ```
 scripts/          the shell, the renderer, the simulation
-  model/          pure logic, no scene tree: MenuModel, HudModel, PlayerInput
-  app/            LaunchOptions (the command line)
+  model/          pure logic, no scene tree: MenuModel, HudModel, PlayerInput,
+                  RoadEditModel (the road format and what makes one unplayable)
+  app/            LaunchOptions (the command line), CaptureService (--shots and
+                  friends), InputDevices (keyboard, pad, mouse, stick)
 data/             derived assets + the recovered camera and tables
   branding/       app icons, generated from the game's own art
 tests/            suites, fixtures, and golden frames from the reference
+examples/         roads built with the editor, and a solved route for one
 docs/parity/      before/after evidence for each fidelity fix
 ```
 
@@ -390,11 +442,14 @@ they are, and nothing here should be spent on store assets or signing.
 
 ## What is next
 
-`docs/PLAN.md` — four things the original never did: polishing the joystick and
-gamepad handling, deciding what "full screen" should mean on a phone (the
-letterbox is geometry, not an oversight — see `docs/BUGS.md` §12.25), a
-first-person mode, and a level editor. None is started, and the plan says for
-each one what it costs and which measured result it puts at risk.
+`docs/PLAN.md` — four things the original never did. The **level editor** is
+built (see [Making a road](#making-a-road)) and the **gamepad and stick** pass
+is in, though nobody has yet played either on real hardware. Left: deciding
+what "full screen" should mean on a phone (the letterbox is geometry, not an
+oversight — see `docs/BUGS.md` §12.25) and a first-person mode. The plan says
+for each one what it costs and which measured result it puts at risk.
+
+`docs/PERF.md` — where the frame time and the reading time go, measured.
 
 ## References
 
