@@ -4,7 +4,7 @@ _Last updated: 2026-09-02 · branch **`main`**, pushed and level with `origin` �
 
 ## Next action
 
-Nothing is pending in the repo: ten commits merged to `main` and pushed, the
+Nothing is pending in the repo: eleven commits merged to `main` and pushed, the
 full gate green (613 checks, 92 ok, 0 failures, 23 roads replayed). Pick from
 **Open questions** — the largest is the seven unrouted roads, and that wants
 `analysis/` under git first, because the work would live there.
