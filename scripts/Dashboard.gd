@@ -33,6 +33,8 @@ var _warn_masks := {}                 ## "oxy"/"fuel" -> [pixels@99, pixels@100]
 ## black readout window. Measured from DASHBRD.LZS, not assumed — see
 ## _precompute_gravity_window.
 var _grav_window := []
+## What the last _draw() painted, so an unchanged dashboard is not repainted.
+var _sig: Array = []
 
 ## Reproduce the original's unreadable GRAV-O-METER exactly (BUGS #41).
 ##
@@ -141,9 +143,38 @@ func _load(path: String) -> Dictionary:
 	return JSON.parse_string(f.get_as_text()) as Dictionary
 
 
+## Called once per RENDERED frame, which is up to 120 times a second, while
+## everything it can draw changes at most 36 — and in practice a handful of
+## times a second. _draw() stamps every lit gauge pixel as its own draw_rect
+## (2,281 of them with the speedometer full), so redrawing an unchanged
+## dashboard was 31% of the port's whole per-frame script cost: measured
+## uncapped on road 21, 1.01 ms/frame with the dashboard drawing and 0.70 ms
+## with it hidden.
+##
+## So the redraw is keyed off what the dashboard actually SHOWS, not off the
+## frame. Everything _draw() reads is in the signature, including
+## authentic_gravity_window — tests/render_dashboard.gd flips it between two
+## otherwise identical states and compares the frames, and a signature without
+## it would hand that test the same picture twice.
 func update(play: SkyRoadsPlay, rows: int) -> void:
 	_play = play
 	_rows = maxi(rows, 1)
+	var sig := [
+		HudModel.speed_segments(play.speed, play.ap_delta),
+		HudModel.gauge_segments(play.oxy),
+		HudModel.gauge_segments(play.fuel),
+		HudModel.progress_steps(play.z, _rows),
+		HudModel.gravity_value(play.road.gravity),
+		play.ap_light,
+		play.end_state,
+		HudModel.warn_lit(play.tick),
+		authentic_gravity_window,
+	]
+	# _palette is empty until _ready has run, and a _draw() that returns early
+	# must not be remembered as "already painted this state"
+	if sig == _sig and not _palette.is_empty():
+		return
+	_sig = sig
 	queue_redraw()
 
 

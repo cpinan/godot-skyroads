@@ -211,44 +211,36 @@ const SHIP_SPLIT_DEPTH := BEHIND_ROWS
 ##         depth buffer.
 enum { CLIP_NONE = 0, CLIP_FAR = 1, CLIP_NEAR = 2 }
 
-static func make_dos_material(transparent := false, depth_always := false,
-		no_depth_test := false, priority := 0,
-		clip := CLIP_NONE) -> ShaderMaterial:
-	var modes := "unshaded, cull_disabled"
-	if no_depth_test:
-		modes += ", depth_test_disabled, depth_draw_never"
-	elif depth_always:
-		modes += ", depth_draw_always"
-	# the halves must partition, not overlap: one side takes the boundary
-	# The world is composed into rows 32..137 of the DOS framebuffer and never
-	# above: render.c writes into `fb->px + 32*320` and the span records are
-	# baked to stay inside that. A 3D camera has no such bound, so a tall block
-	# close to the ship projects up into the sky. This clips it in screen space
-	# instead — which is what the original's baked bands amount to.
-	#
-	# It used to be done by painting the backdrop's own top rows back over the
-	# 3D from a CanvasLayer. That also painted over the SHIP, which the
-	# original draws unclipped (draw_ship bounds x and the cowl, never y), so a
-	# high jump had its top sheared off: measured on road 17 t=150, the
-	# reference draws 290 ship pixels from row 31 down and the port drew 145
-	# from row 35.
-	var clip_src := "\tif (SCREEN_UV.y < %f) discard;" % (
-		float(SkyRoads.VIEW_TOP) * SkyRoads.PIXEL_ASPECT / SkyRoads.SQUARE_H)
-	if clip == CLIP_FAR:
-		clip_src += "\n\tif (v_depth < %f) discard;" % SHIP_SPLIT_DEPTH
-	elif clip == CLIP_NEAR:
-		clip_src += "\n\tif (v_depth >= %f) discard;" % SHIP_SPLIT_DEPTH
-	# Surface-ID pass: every quad carries the id of the reference RECORD it
-	# claims to be (scripts/app/SurfaceIds.gd) in UV2.x, and when sid_mode is
-	# on the fragment paints that id instead of the palette colour. Geometry,
-	# clipping and draw order are untouched, so the map is of the frame that
-	# would otherwise have been drawn — see BUGS §12.14 for why colour cannot
-	# answer the same question.
-	var code := "shader_type spatial;\nrender_mode " + modes + ";\n" + """
+## One compiled Shader per render_mode combination, shared by every material
+## that wants it. There are only three in the whole game — opaque, the
+## transparent cover pass, and the debug overlay — and `clip` is a uniform
+## rather than a fourth source variant, so restarting a road reuses programs
+## the driver has already compiled instead of handing it eight new ones.
+## Building the source per material cost a GL program compile on every road
+## start AND on every death, which is a phone-visible hitch and buys nothing:
+## the six road materials differ only in render_priority and which half of the
+## ship's own row they keep.
+static var _shader_cache: Dictionary = {}
+
+
+## A float as GLSL will read it. Bare str() drops the point on a whole number,
+## and `(v.y + 1) * tier` is an int-times-float that does not compile.
+static func _f(v: float) -> String:
+	return "%.6f" % v
+
+
+## Source for one render_mode combination. `%s` interpolation is deliberately
+## absent: the twelve positional arguments it used to take could not be checked
+## by eye, and every one of them is a named constant a few lines above.
+static func _dos_shader_source(modes: String, transparent: bool) -> String:
+	return """shader_type spatial;
+render_mode {modes};
 varying float v_depth;
 varying float v_sid;
 varying float v_arch;
 uniform float sid_mode = 0.0;
+// CLIP_NONE / CLIP_FAR / CLIP_NEAR — which half of the ship's own row to keep
+uniform int clip_mode = 0;
 // the arch band fan: bounds[c] holds one column cell's boundary ratios, and
 // the two palettes are the same six records resolved through sr_quad for each
 // screen half (SkyRoadsCamera.ARCH_BAND_RATIOS / ARCH_RECORD_*)
@@ -261,19 +253,34 @@ void vertex() {
 	v_depth = d;
 	v_sid = UV2.x;
 	v_arch = UV2.y;
-	float y200 = %f + %f / d;
-	float dos_lane = max(%f * (y200 - %f), 0.001);
-	float pin_lane = 46.0 * %f / d;
+	float y200 = {dos_p200} + {dos_f200} / d;
+	float dos_lane = max({lane_per_line} * (y200 - {x_vanish}), 0.001);
+	float pin_lane = 46.0 * {behind_rows} / d;
 	v.x *= dos_lane / pin_lane;
 	// the vertical twin: the original draws raised surfaces flatter with
 	// distance than perspective does, and 1:1 at the ship's own depth
-	float gd = max(d, %f);
-	float tier = max(%f + %f * gd + %f / gd, 0.0);
-	v.y = (v.y + %f) * tier - %f;
+	float gd = max(d, {tier_min_depth});
+	float tier = max({tier_a} + {tier_b} * gd + {tier_c} / gd, 0.0);
+	v.y = (v.y + {cam_height}) * tier - {cam_height};
 	POSITION = PROJECTION_MATRIX * v;
 }
 void fragment() {
-%s
+	// The world is composed into rows 32..137 of the DOS framebuffer and never
+	// above: render.c writes into `fb->px + 32*320` and the span records are
+	// baked to stay inside that. A 3D camera has no such bound, so a tall block
+	// close to the ship projects up into the sky. This clips it in screen space
+	// instead — which is what the original's baked bands amount to.
+	//
+	// It used to be done by painting the backdrop's own top rows back over the
+	// 3D from a CanvasLayer. That also painted over the SHIP, which the
+	// original draws unclipped (draw_ship bounds x and the cowl, never y), so a
+	// high jump had its top sheared off: measured on road 17 t=150, the
+	// reference draws 290 ship pixels from row 31 down and the port drew 145
+	// from row 35.
+	if (SCREEN_UV.y < {view_top_uv}) discard;
+	// the halves must partition, not overlap: one side takes the boundary
+	if (clip_mode == 1 && v_depth < {split_depth}) discard;
+	if (clip_mode == 2 && v_depth >= {split_depth}) discard;
 	// A tunnel vault quad carries its column + 1 in UV2.y and takes its
 	// record from WHERE IT LANDS ON SCREEN, not from its own geometry: the
 	// original's six arch records are separated by fixed radial lines through
@@ -292,6 +299,12 @@ void fragment() {
 			rec = m > b.x ? 2.0 : (m > b.y ? 3.0 : (m > b.z ? 4.0 : 5.0));
 		}
 	}
+	// Surface-ID pass: every quad carries the id of the reference RECORD it
+	// claims to be (scripts/app/SurfaceIds.gd) in UV2.x, and when sid_mode is
+	// on the fragment paints that id instead of the palette colour. Geometry,
+	// clipping and draw order are untouched, so the map is of the frame that
+	// would otherwise have been drawn — see BUGS §12.14 for why colour cannot
+	// answer the same question.
 	if (sid_mode > 0.5) {
 		float sid = rec >= 0.0 ? 65.0 + rec : floor(v_sid + 0.5);
 		ALBEDO = vec3(
@@ -303,16 +316,47 @@ void fragment() {
 	} else {
 		ALBEDO = COLOR.rgb;
 	}
-%s
+{alpha}
 }
-""" % [DOS_P200, DOS_F200, DOS_LANE_PER_LINE, DOS_X_VANISH_Y, BEHIND_ROWS,
-		DOS_TIER_MIN_DEPTH, DOS_TIER_A, DOS_TIER_B, DOS_TIER_C,
-		CAMERA_HEIGHT, CAMERA_HEIGHT,
-		clip_src, "\tALPHA = COLOR.a;" if transparent else ""]
-	var sh := Shader.new()
-	sh.code = code
+""".format({
+		"modes": modes,
+		"dos_p200": _f(DOS_P200), "dos_f200": _f(DOS_F200),
+		"lane_per_line": _f(DOS_LANE_PER_LINE), "x_vanish": _f(DOS_X_VANISH_Y),
+		"behind_rows": _f(BEHIND_ROWS),
+		"tier_min_depth": _f(DOS_TIER_MIN_DEPTH),
+		"tier_a": _f(DOS_TIER_A), "tier_b": _f(DOS_TIER_B),
+		"tier_c": _f(DOS_TIER_C),
+		"cam_height": _f(CAMERA_HEIGHT),
+		"view_top_uv": _f(float(SkyRoads.VIEW_TOP) * SkyRoads.PIXEL_ASPECT
+			/ SkyRoads.SQUARE_H),
+		"split_depth": _f(SHIP_SPLIT_DEPTH),
+		# Writing ALPHA at all is what puts a spatial shader in the transparent
+		# QUEUE, so it cannot be a uniform: the cover rows and the opaque road
+		# need different source, and that is why there is more than one shader.
+		"alpha": "\tALPHA = COLOR.a;" if transparent else "",
+	})
+
+
+static func _dos_shader(modes: String, transparent: bool) -> Shader:
+	var key := "%s|%s" % [modes, transparent]
+	if not _shader_cache.has(key):
+		var sh := Shader.new()
+		sh.code = _dos_shader_source(modes, transparent)
+		_shader_cache[key] = sh
+	return _shader_cache[key]
+
+
+static func make_dos_material(transparent := false, depth_always := false,
+		no_depth_test := false, priority := 0,
+		clip := CLIP_NONE) -> ShaderMaterial:
+	var modes := "unshaded, cull_disabled"
+	if no_depth_test:
+		modes += ", depth_test_disabled, depth_draw_never"
+	elif depth_always:
+		modes += ", depth_draw_always"
 	var mat := ShaderMaterial.new()
-	mat.shader = sh
+	mat.shader = _dos_shader(modes, transparent)
+	mat.set_shader_parameter("clip_mode", clip)
 	mat.render_priority = priority
 	return mat
 

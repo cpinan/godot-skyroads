@@ -81,9 +81,15 @@ func setup(cam: SkyRoadsCamera) -> void:
 
 	_ship_rect = _make_sprite()
 	add_child(_ship_rect)
-	_sid_ship = _make_sid_material(SurfaceIds.SHIP, true)
-	_sid_shadow = _make_sid_material(SurfaceIds.SHADOW, false)
+	# the two surface-ID materials are NOT built here: they are only ever used
+	# by --surface-ids, and building them cost the driver a shader program on
+	# every road start and every death for a feature no player reaches
 	_normal_shadow = smat
+
+
+## One shader for both materials, built once for the process: the ship and the
+## shadow differ only in `sid_rgb` and `alpha_keyed`, which are uniforms.
+static var _sid_shader: Shader = null
 
 
 ## The ship and its shadow in the surface map: a flat record id wherever the
@@ -93,9 +99,10 @@ func setup(cam: SkyRoadsCamera) -> void:
 ##
 ## Sprite3D binds its texture to its own built-in material, so an override has
 ## to be handed the same texture; sync() does that while the mode is on.
-func _make_sid_material(sid: int, alpha_keyed: bool) -> ShaderMaterial:
-	var sh := Shader.new()
-	sh.code = """
+static func _make_sid_material(sid: int, alpha_keyed: bool) -> ShaderMaterial:
+	if _sid_shader == null:
+		var sh := Shader.new()
+		sh.code = """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_test_disabled, depth_draw_never;
 uniform sampler2D sprite_tex : filter_nearest, source_color;
@@ -111,8 +118,9 @@ void fragment() {
 	ALBEDO = sid_rgb;
 }
 """
+		_sid_shader = sh
 	var mat := ShaderMaterial.new()
-	mat.shader = sh
+	mat.shader = _sid_shader
 	var c := SurfaceIds.encode(sid)
 	mat.set_shader_parameter("sid_rgb", Vector3(c.r, c.g, c.b))
 	mat.set_shader_parameter("alpha_keyed", 1.0 if alpha_keyed else 0.0)
@@ -126,6 +134,9 @@ void fragment() {
 ## RoadMesh.set_sid_mode by Main; neither is meaningful alone.
 func set_sid_mode(on: bool) -> void:
 	_sid_mode = on
+	if on and _sid_ship == null:
+		_sid_ship = _make_sid_material(SurfaceIds.SHIP, true)
+		_sid_shadow = _make_sid_material(SurfaceIds.SHADOW, false)
 	_ship_rect.material_override = _sid_ship if on else null
 	_shadow_rect.material_override = _sid_shadow if on else _normal_shadow
 
