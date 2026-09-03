@@ -187,8 +187,12 @@ own.
 Still not done: no copy/paste, no palette editor (a road borrows the 72 colours
 of the first shipped road of its `world`, and every plain floor is nibble 3), no
 overview of a long road, and no reachability check between adjacent rows — that
-last one is the solver's job. It is keyboard and mouse only and unusable on a
-phone, which should be written down rather than fixed.
+last one is the solver's job.
+
+**Desktop only, and deliberately.** Keyboard and mouse, no touch layer. A
+320x240 grid driven by a thumb is a different program, not a port of this one,
+and the flag-only entry keeps it out of a phone build's reach for free. Written
+down 2026-09-02 rather than fixed.
 
 ### The original plan
 

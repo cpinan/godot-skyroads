@@ -248,7 +248,7 @@ func _emit_cell(floor_st: SurfaceTool, solid_st: SurfaceTool,
 	if geom > 5:
 		return                      # composer jump table sends 6..15 to ret
 	var w := SkyRoadsCamera.COLUMN_WIDTH
-	var x0 := (col - 3.5) * w
+	var x0 := (col - SkyRoadsCamera.HALF_COLS) * w
 	var x1 := x0 + w
 	var z0 := -float(row)
 	var z1 := z0 - 1.0
@@ -343,20 +343,21 @@ func _block(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 		# top, and the arch's inner surface — the kind-1 "entrance", colour
 		# 0x41 = 65 — carries on through the cell behind it. The bore never
 		# reaches the cell edge, so the side faces stay full height.
-		var px := (x1 - x0) / 46.0
+		var px := (x1 - x0) / float(SkyRoadsCamera.SLICES_PER_CELL)
 		var interior := _colour(TUNNEL_WALL_COLOUR)
 		var bore := PackedFloat32Array()
-		bore.resize(47)
-		for b in 47:
-			bore[b] = ARCH_BORE_PX[absi(b - 23)] * PIXEL_Y
-		for slice in 46:
+		bore.resize(SkyRoadsCamera.SLICE_BOUNDARIES)
+		for b in SkyRoadsCamera.SLICE_BOUNDARIES:
+			bore[b] = ARCH_BORE_PX[absi(b - SkyRoadsCamera.CENTRE_SLICE)] * PIXEL_Y
+		for slice in SkyRoadsCamera.SLICES_PER_CELL:
 			var i0 := bore[slice]
 			var i1 := bore[slice + 1]
 			var sx0 := x0 + slice * px
 			var sx1 := sx0 + px
 			# the reference splits this front into a pair of records, one
 			# each side of the bore; slice 23 is the lane centre
-			var front_sid: int = sids[1] if slice < 23 else sids[3]
+			var front_sid: int = sids[1] if slice < SkyRoadsCamera.CENTRE_SLICE \
+					else sids[3]
 			if i0 < top_y or i1 < top_y:
 				_quad(st, Vector3(sx0, top_y, z0), Vector3(sx1, top_y, z0),
 					Vector3(sx1, i1, z0), Vector3(sx0, i0, z0), front_c,
@@ -433,18 +434,18 @@ func _tunnel(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float,
 	# compose_tunnel patches the bore's wall with 0x43 = 67, but the block
 	# variants (compose_tun_low / _high) use 0x41 = 65 for the same surface
 	var wall_c := _colour(wall)
-	var px := (x1 - x0) / 46.0
+	var px := (x1 - x0) / float(SkyRoadsCamera.SLICES_PER_CELL)
 	# heights at the 47 slice BOUNDARIES, so the surfaces slope with the arch
 	# instead of leaving vertical steps between slices
 	var outer := PackedFloat32Array()
 	var bore := PackedFloat32Array()
-	outer.resize(47)
-	bore.resize(47)
-	for b in 47:
-		var u: int = absi(b - 23)
+	outer.resize(SkyRoadsCamera.SLICE_BOUNDARIES)
+	bore.resize(SkyRoadsCamera.SLICE_BOUNDARIES)
+	for b in SkyRoadsCamera.SLICE_BOUNDARIES:
+		var u: int = absi(b - SkyRoadsCamera.CENTRE_SLICE)
 		outer[b] = ARCH_OUTER_PX[u] * PIXEL_Y
 		bore[b] = ARCH_BORE_PX[u] * PIXEL_Y
-	for slice in 46:
+	for slice in SkyRoadsCamera.SLICES_PER_CELL:
 		var sx0 := x0 + slice * px
 		var sx1 := sx0 + px
 		var o0 := outer[slice]

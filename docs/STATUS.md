@@ -46,9 +46,10 @@ THREEWAY=1 tools/verify.sh           # + C vs Python vs GDScript on real levels
 ```
 
 **`QUICK=1` runs every assertion the full gate does** and skips only the road
-replays, which are ~94% of the runtime (78 s vs ~20 min; phases print at the
-end). It prints `QUICK OK`, never `VERIFY OK`, so a grep cannot mistake one for
-the other. Run the full gate before committing.
+replays. Measured on one full run: `parse 8s  rendering 62s  suites 8s
+end-to-end 687s` — the replays are 90% of it, and QUICK finishes in 78 s. It
+prints `QUICK OK`, never `VERIFY OK`, so a grep cannot mistake one for the
+other. Run the full gate before committing.
 
 The full run is twenty minutes — background it. **Do not edit a source file
 while it runs**, and never edit `verify.sh` itself mid-run: bash reads a script

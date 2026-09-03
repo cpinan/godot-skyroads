@@ -158,6 +158,11 @@ which also marks the setting currently in force in orange. A gamepad reads the
 left stick or the d-pad, and A/B/X/Y, either shoulder and either trigger all
 jump — the 1993 joystick had two buttons and either of them jumped.
 
+**No controller has ever been plugged into this.** The gamepad path is written
+against Godot's `Input` API and covered by `tests/test_input.gd` at the mapping
+level, which is the part that can be tested without hardware; the thresholds
+were reasoned from a resting stick's noise rather than measured on one.
+
 ---
 
 ## Making a road
@@ -208,6 +213,11 @@ with `--road 0 --level-file user://levels/NAME.json`.
 `examples/vaults.json` is one built this way, with a solved route beside it.
 Its first draft was unsolvable and the solver said where: row 34.7, three rows
 of ice ending against a wall with one open lane. See `examples/README.md`.
+
+**The editor is desktop only.** It is keyboard and mouse, it has no touch
+layer, and a 320x240 grid driven by a thumb would be a different program. It is
+excluded from the phone build's reach by the same thing that keeps it off the
+menus: there is no way in but a command-line flag.
 
 ---
 
@@ -374,14 +384,15 @@ THREEWAY=1 ./verify.sh         # + C vs Python vs GDScript on real levels
 ```
 
 **`QUICK=1` runs every assertion the full gate does.** The 23 end-to-end
-replays it skips drive real scenes at the real tick rate and are worth about
-94% of the runtime — measured: 78 s against roughly twenty minutes, phases
-`parse 8s  rendering 62s  suites 8s`. They contribute no assertions of their
+replays it skips drive real scenes at the real tick rate, so they cost real
+time: one measured run printed `parse 8s  rendering 62s  suites 8s
+end-to-end 687s`, which is 90% of it. They contribute no assertions of their
 own; what they prove is that the whole stack, from `Main.tscn` through
 `GameLoop`'s accumulator into the simulation, still finishes a road. So QUICK
 is for the edit loop and the full run is for a commit, and a QUICK run
 deliberately does not print the words `VERIFY OK` — a grep for those must never
-match a run that never drove a road.
+match a run that never drove a road. The phase line prints either way, so the
+split stays a measurement.
 
 `verify.sh` runs three passes, because a suite run alone lies in two
 documented ways: a syntax error in an unreferenced file ships green, and a

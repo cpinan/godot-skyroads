@@ -81,7 +81,7 @@ func _rebuild(play: SkyRoadsPlay, row: int) -> void:
 			var code: int = play.road.tile(r, c)
 			if code == 0:
 				continue
-			var x0: float = (float(c) - 3.5) * w
+			var x0: float = (float(c) - SkyRoadsCamera.HALF_COLS) * w
 			var x1: float = x0 + w
 			var z0 := -float(r)
 			var z1 := z0 - 1.0
@@ -111,7 +111,7 @@ func _rebuild(play: SkyRoadsPlay, row: int) -> void:
 		var zz: int = r2 << 16
 		var run_start := -1
 		for px in range(0, 330, 2):
-			var xx: int = (0x5F + px) * 0x80
+			var xx: int = (SkyRoadsCamera.ROAD_LEFT_PX + px) * 0x80
 			var blocked: bool = play.solid(zz, xx, play.y)
 			if blocked and run_start < 0:
 				run_start = px
@@ -137,9 +137,9 @@ func _rebuild(play: SkyRoadsPlay, row: int) -> void:
 ## The tunnel shell, from the same inner/outer tables collision uses.
 func _tunnel_solid(st: SurfaceTool, x0: float, x1: float, z0: float,
 		z1: float, col: Color) -> void:
-	var px: float = (x1 - x0) / 46.0
-	for slice in 46:
-		var t: int = absi(23 - slice)
+	var px: float = (x1 - x0) / float(SkyRoadsCamera.SLICES_PER_CELL)
+	for slice in SkyRoadsCamera.SLICES_PER_CELL:
+		var t: int = absi(SkyRoadsCamera.CENTRE_SLICE - slice)
 		if t >= SkyRoads.TUN_INNER.size():
 			continue
 		var lo: int = SkyRoads.TUN_INNER[t]
@@ -157,8 +157,10 @@ func _tunnel_solid(st: SurfaceTool, x0: float, x1: float, z0: float,
 ## A thin marker spanning road pixels [px0, px1) on row r, just above the deck.
 func _mark(st: SurfaceTool, px0: int, px1: int, r: int, col: Color) -> void:
 	var w: float = SkyRoadsCamera.COLUMN_WIDTH
-	var x0: float = (float(px0) / 46.0 - 3.5) * w
-	var x1: float = (float(px1) / 46.0 - 3.5) * w
+	var x0: float = (float(px0) / float(SkyRoadsCamera.SLICES_PER_CELL)
+		- SkyRoadsCamera.HALF_COLS) * w
+	var x1: float = (float(px1) / float(SkyRoadsCamera.SLICES_PER_CELL)
+		- SkyRoadsCamera.HALF_COLS) * w
 	var y: float = 0.02
 	_box(st, x0, x1, -float(r) - 0.9, -float(r) - 0.1, y, y + 0.015, col)
 

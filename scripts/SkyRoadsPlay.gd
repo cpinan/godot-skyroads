@@ -340,7 +340,30 @@ func set_input(st: int, ac: int, jp: int) -> void:
 
 
 # --- one 36 Hz tick (fn_1f2c 0x22a3..0x2add) ------------------------------
+#
+# This is a transcription, so its shape is the binary's and not a design: it
+# runs straight through eleven phases in a fixed order, and reordering any two
+# of them changes the game. The markers below name them; they are the only
+# thing in this function that is not the original.
+#
+#   1  bookkeeping, and the fly-away that ends a finished road
+#   2  the death holds — an end state does not stop the tick, it counts frames
+#   3  the tile under the ship, and the surface effects it applies
+#   4  the finish gate
+#   5  landing aftermath: the bounce
+#   6  the player's input — throttle, steering, jump
+#   7  the landing assist
+#   8  gravity, or the explosion's own vertical motion
+#   9  the swept move, and what it ran into: corner, wall, scrape
+#  10  what a landing does: the edge probe and the side push
+#  11  the tanks, and the tests that end the road
+#
+# Do not restructure it into sub-functions without a failing three-way trace
+# to justify the change. It is proven bit-exact against the C engine and the
+# Python model over 60,964 ticks, and that proof is the reason the port can
+# claim what it claims.
 func step() -> int:
+	# 1 --- bookkeeping, and the fly-away -----------------------------------
 	var rows := road.rows
 	tick += 1
 	pending_sfx = 0
@@ -350,6 +373,7 @@ func step() -> int:
 		fly_ticks -= 1
 		return COMPLETE if fly_ticks == 0 else RUNNING
 
+	# 2 --- the death holds -------------------------------------------------
 	if not (expl_ctr != 0 and expl_ctr <= SkyRoads.EXPL_FRAMES):
 		if end_state == 1:
 			return WALL
@@ -360,6 +384,7 @@ func step() -> int:
 		if end_frames >= SkyRoads.DEATH_HOLD:
 			return end_state
 
+	# 3 --- the tile underneath, and what it does to the ship ---------------
 	tile_code = tile_at(z, x)
 	over_hole = 1 if tile_code == 0 else 0
 
@@ -374,6 +399,7 @@ func step() -> int:
 	else:
 		on_sticky = 0                         # ice persists while airborne
 
+	# 4 --- the finish gate -------------------------------------------------
 	# the finish line is literally a tunnel on the last row, and the ship has
 	# to fly low enough to be inside its mouth — jumping the gate does nothing
 	if z >= (((rows - 1) << 16) + 0x8000) and in_tunnel(z, x, y) and end_state == 0:
@@ -381,6 +407,7 @@ func step() -> int:
 		fly_ticks = SkyRoads.FLY_AWAY
 		return RUNNING
 
+	# 5 --- landing aftermath: the bounce -----------------------------------
 	if y != last_new_y:                       # landing aftermath / bounce
 		if side_push != 0 and edge_dist < 2:
 			yvel = 0
@@ -393,6 +420,7 @@ func step() -> int:
 			else:
 				yvel = 0
 
+	# 6 --- the player's input ----------------------------------------------
 	if end_state == 0:
 		speed += accel * SkyRoads.SPEED_ACCEL
 		speed = clampi(speed, 0, SkyRoads.SPEED_MAX)
@@ -408,10 +436,12 @@ func step() -> int:
 			jumping = 1
 			jump_start_y = y
 
+	# 7 --- the landing assist ----------------------------------------------
 	if autopilot_on and jumping and not ap_done and y >= SkyRoads.AP_TRIGGER_Y:
 		_autopilot()
 		ap_done = 1
 
+	# 8 --- gravity, or the explosion's own vertical motion -----------------
 	if expl_ctr == 0:
 		if y >= SkyRoads.Y_DECK:
 			yvel = s16(yvel + grav_accel)
@@ -422,6 +452,7 @@ func step() -> int:
 			yvel = 0
 		yvel = s16(yvel + SkyRoads.EXPL_YVEL_STEP) if yvel < SkyRoads.EXPL_YVEL_CAP else SkyRoads.EXPL_YVEL_CAP
 
+	# 9 --- the swept move, and what it ran into ----------------------------
 	var new_z := u32(z + speed)
 	# sticky floors LOSE the lateral bonus (EXE 0x2634) — they are not friction,
 	# they are a near-stop, and they take your steering authority with them
@@ -462,6 +493,7 @@ func step() -> int:
 			side_push = 0
 		speed = clampi(speed - SkyRoads.SPEED_SCRAPE, 0, SkyRoads.SPEED_MAX)
 
+	# 10 --- what a landing does --------------------------------------------
 	on_ground = 0
 	if y != new_y and yvel < 0:               # landed
 		ap_light = 0
@@ -488,6 +520,7 @@ func step() -> int:
 	if y > 0x7FFF:
 		y = 0
 
+	# 11 --- the tanks, and the tests that end the road ---------------------
 	if end_state == 0:
 		var oxy_div := u16(SkyRoads.OXY_TICK_DIV * road.oxygen_secs)
 		if oxy_div:

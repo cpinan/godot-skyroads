@@ -22,6 +22,10 @@
 class_name Menu
 extends CanvasLayer
 
+## The pictures and what has to be done to them. Preloaded rather than reached
+## by class_name, for the reason in scripts/PauseMenu.gd.
+const MenuArt = preload("res://scripts/menu/MenuArt.gd")
+
 signal start_road(index: int)
 signal quit_game
 
@@ -31,10 +35,7 @@ const Screen := MenuModel.Screen
 
 ## fn_5064: the road-name cell is 48x9 at 0xF3E = (62,12), +9 rows per road,
 ## +39 rows per world, and the right-hand column is +0xA0 = 160 px across.
-const GO_BASE := Vector2i(62, 12)
-const GO_ROAD_PITCH := 9
-const GO_WORLD_PITCH := 39
-const GO_COLUMN := 160
+# the road-select grid's geometry lives with the art, next to road_cell()
 ## fn_5164: completion ticks start at 0x11F0 = (112,14), 7 px apart, max 7.
 const TICK_BASE := Vector2i(112, 14)
 const TICK_PITCH := 7
@@ -76,7 +77,6 @@ var help_page: int:
 ## switches are instant.
 var fader: Callable
 
-var _tex_cache := {}
 var _sprites: Array[TextureRect] = []
 var _bg: TextureRect
 var _overlay: Control
@@ -99,24 +99,19 @@ const SET_CURSOR_FIRST := 1
 ## currently in force rather than for the cursor.
 const SET_STATE_FIRST := 6
 
-var _gfx: Dictionary = {}
+## Where the pictures are and what they look like (scripts/menu/MenuArt.gd).
+var _art := MenuArt.new()
 
 ## GOMENU pict 0 as palette INDICES plus the 256-entry palette the original
 ## builds for it. The road-select highlight is a palette remap, not an
 ## overlay (game.c:147-155), and an RGB png cannot express it.
-var _go_idx: PackedByteArray = PackedByteArray()
-var _go_pal: Array = []
-var _go_w := 0
-var _go_h := 0
-var _go_hi := {}                ## go_sel -> brightened 48x9 ImageTexture
 
 
 func _ready() -> void:
 	if cfg == null:
 		cfg = Config.new()
-	var gf := FileAccess.open("res://data/gfx/gfx.json", FileAccess.READ)
-	if gf != null:
-		_gfx = (JSON.parse_string(gf.get_as_text()) as Dictionary)["files"]
+	_art.touch_ui = touch_ui
+	_art.load_index()
 	# A CanvasLayer is not a Control, so anchor presets inside it resolve
 	# against nothing and every child collapses. Size everything explicitly in
 	# the original's 320x240 display space instead.
@@ -156,52 +151,10 @@ func _ready() -> void:
 	# fn_4dac once and then a second time only if the key was not ESC, and
 	# then returns. helpmenu_2 is art the 1993 game never displays, like
 	# INTRO.LZS's "Highscore" plate. Take the smaller of the two.
-	var pages: int = (_gfx.get("helpmenu", []) as Array).size()
+	var pages: int = _art.help_pages()
 	if pages > 0:
 		model.help_pages = mini(pages, MenuModel.HELP_PAGES)
-	_load_gomenu_index()
 	_show()
-
-
-## Optional: without it the selection falls back to an outline rectangle.
-func _load_gomenu_index() -> void:
-	var f := FileAccess.open("res://data/gfx/gomenu_index.json", FileAccess.READ)
-	if f == null:
-		return
-	var d = JSON.parse_string(f.get_as_text())
-	if not (d is Dictionary):
-		return
-	_go_w = int(d.get("width", 0))
-	_go_h = int(d.get("height", 0))
-	_go_pal = d.get("palette", [])
-	_go_idx = Marshalls.base64_to_raw(str(d.get("pixels", "")))
-	if _go_idx.size() < _go_w * _go_h or _go_pal.size() < 256:
-		_go_idx = PackedByteArray()          # unusable; keep the fallback
-
-
-## The selected road's name cell with the original's brighten applied:
-## every pixel of index >= 0x63 becomes 240 + (p & 7) (game.c:147-155).
-func _highlight_tex(sel: int) -> ImageTexture:
-	if _go_hi.has(sel):
-		return _go_hi[sel]
-	var c := road_cell(sel)
-	var img := Image.create(48, 9, false, Image.FORMAT_RGBA8)
-	for y in 9:
-		for x in 48:
-			var sx: int = c.x + x
-			var sy: int = c.y + y
-			if sx < 0 or sy < 0 or sx >= _go_w or sy >= _go_h:
-				continue
-			var p: int = _go_idx[sy * _go_w + sx]
-			if p == 0:
-				continue                      # index 0 is transparent
-			if p >= 0x63:
-				p = 240 + (p & 7)
-			var e: Array = _go_pal[p]
-			img.set_pixel(x, y, Color8(e[0], e[1], e[2]))
-	var tex := ImageTexture.create_from_image(img)
-	_go_hi[sel] = tex
-	return tex
 
 
 ## The original's 320x200 screen is displayed at 4:3. Everything here is placed
@@ -213,7 +166,7 @@ func _to_canvas(p: Vector2) -> Vector2:
 
 ## Put an image where its PICT says it belongs, in display space.
 func _place(file: String, name: String) -> void:
-	var tex := _tex(name)
+	var tex := _art.tex(name)
 	if tex == null:
 		return
 	var tr := TextureRect.new()
@@ -221,7 +174,7 @@ func _place(file: String, name: String) -> void:
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tr.stretch_mode = TextureRect.STRETCH_SCALE
 	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	tr.position = _to_canvas(_gfx_pos(file, name))
+	tr.position = _art.to_canvas(_art.gfx_pos(file, name))
 	tr.size = Vector2(tex.get_width(),
 		tex.get_height() * SkyRoads.PIXEL_ASPECT)
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -229,112 +182,21 @@ func _place(file: String, name: String) -> void:
 	_sprites.append(tr)
 
 
-## Textures are cached because a texture first load()ed INSIDE a draw
-## handler renders as a plain white rectangle — its RID is not ready for the
-## frame already being built. The road-select completion ticks were drawn
-## that way and came out as white blocks instead of the original's small
-## amber pips. Anything reached from _draw_overlay must be resolved here
-## first, outside the draw pass.
-## The hint lines painted into the retail full-screen menus, as (first row,
-## last row) in the original's 200-row space. Found by looking for bright-pixel
-## spikes in the lower third of each picture and reading the crops.
-const TOUCH_HINT_BANDS := {
-	"setmenu": [[176, 190]],                          # "Press Esc to exit menu"
-	"helpmenu": [[164, 194]],                         # ESC to exit / SPACE for next
-}
-## Columns to take replacement background from. The retail wording is centred,
-## so the left margin of the SAME ROW is always background — which beats
-## copying a band from elsewhere in the picture, because the row keeps its own
-## lighting and there is no clean band to find anyway (the first attempt tiled
-## fragments of the help text back over itself).
-const TOUCH_HINT_MARGIN := 40
-## What the port draws instead, once the retail wording is covered.
-const TOUCH_HINT_TEXT := {
-	# was "TAP OUTSIDE TO GO BACK", which stopped being true when a missed
-	# tap became inert -- see _keys_for_tap. The X is the way out now, on this
-	# screen as on the other two.
-	"setmenu": ["TAP THE X TO GO BACK"],
-	"helpmenu": ["TAP TO TURN THE PAGE"],
-}
-
-
-func _tex(name: String) -> Texture2D:
-	var key := name + ("!touch" if touch_ui else "")
-	if _tex_cache.has(key):
-		return _tex_cache[key]
-	var t: Texture2D = load("res://data/gfx/%s.png" % name)
-	if touch_ui and t != null:
-		t = _without_key_hints(name, t)
-	_tex_cache[key] = t
-	return t
-
-
-## A phone has no Esc and no space bar, so the retail hint lines are simply
-## wrong there. They are painted into the 320x200 pictures, so they are covered
-## with background copied from a CLEAN BAND OF THE SAME PICTURE — the
-## backgrounds are mottled noise, so a copied band tiles invisibly — and the
-## port writes its own touch wording over the top in the game's 8x8 font.
-##
-## Nothing on disk is touched and no art is forked: this builds one derived
-## texture in memory, only on Android and iOS, and only for the two pictures
-## that carry the wording. The desktop build never reaches it.
-func _without_key_hints(name: String, tex: Texture2D) -> Texture2D:
-	var family := name.split("_")[0]
-	var bands: Array = TOUCH_HINT_BANDS.get(family, [])
-	if bands.is_empty():
-		return tex
-	var img := tex.get_image()
-	img.convert(Image.FORMAT_RGBA8)
-	var w := img.get_width()
-	for band in bands:
-		var y0: int = band[0]
-		var y1: int = band[1]
-		for y in range(y0, mini(y1 + 1, img.get_height())):
-			for x in w:
-				if x < TOUCH_HINT_MARGIN:
-					continue          # already background; leave it alone
-				img.set_pixel(x, y, img.get_pixel(x % TOUCH_HINT_MARGIN, y))
-	var out := ImageTexture.create_from_image(img)
-	var lines: Array = TOUCH_HINT_TEXT.get(family, [])
-	if not lines.is_empty():
-		_stamp_text(img, lines[0], int(bands[0][0]) + 3)
-		out = ImageTexture.create_from_image(img)
-	return out
-
-
-## Draw one line of 8x8 text straight into the picture, centred. Done here
-## rather than as a separate node so the replacement lives in exactly the same
-## place in the draw order as the wording it replaces.
-func _stamp_text(img: Image, text: String, y: int) -> void:
-	var x0 := int((SkyRoads.SCREEN_W - Text8x8.width(text)) / 2)
-	for i in text.length():
-		var g: Array = Text8x8.glyph_rows(text.unicode_at(i))
-		for row in g.size():
-			var bits: int = g[row]
-			for col in 8:
-				if bits & (1 << col):
-					var px := x0 + i * 8 + col
-					var py := y + row
-					if px >= 0 and px < img.get_width() \
-							and py >= 0 and py < img.get_height():
-						img.set_pixel(px, py, Color(0.83, 0.83, 0.72))
-
-
 func _show() -> void:
 	match screen:
 		Screen.MAIN:
-			_bg.texture = _tex("intro_0")
+			_bg.texture = _art.tex("intro_0")
 		Screen.GO:
-			_bg.texture = _tex("gomenu_0")
+			_bg.texture = _art.tex("gomenu_0")
 		Screen.SETTINGS:
-			_bg.texture = _tex("setmenu_0")
+			_bg.texture = _art.tex("setmenu_0")
 		Screen.HELP:
-			_bg.texture = _tex("helpmenu_%d" % help_page)
+			_bg.texture = _art.tex("helpmenu_%d" % help_page)
 	for c in _sprites:
 		c.queue_free()
 	_sprites.clear()
 	if screen == Screen.GO:
-		_tex("gomenu_1")             # the tick pip, drawn from _draw_overlay
+		_art.tex("gomenu_1")             # the tick pip, drawn from _draw_overlay
 	if screen == Screen.SETTINGS:
 		# The ORANGE overlays first: fn_4ae2 @0x4ae2 walks all five items and
 		# calls fn_4aaf(i + 5, mode) with mode 1 where `i` is the cfg's
@@ -362,13 +224,11 @@ func _show() -> void:
 	_overlay.queue_redraw()
 
 
-## Screen offset of road `rd`'s name cell (fn_5064).
+## Where road `rd`'s name sits in GOMENU.LZS. Static and left on Menu because
+## tests/render_menu.gd calls `Menu.road_cell(12)`; the arithmetic itself lives
+## with the rest of the art.
 static func road_cell(rd: int) -> Vector2i:
-	var p := GO_BASE
-	p.y += ((rd % 15) / 3) * GO_WORLD_PITCH + (rd % 3) * GO_ROAD_PITCH
-	if rd >= 15:
-		p.x += GO_COLUMN
-	return p
+	return MenuArt.road_cell(rd)
 
 
 ## A phone has no Esc key, so the two screens Esc would leave need a way out on
@@ -383,8 +243,8 @@ const TOUCH_CLOSE_RECT := Rect2(298, 3, 18, 14)
 
 
 func _close_rect() -> Rect2:
-	return Rect2(_to_canvas(TOUCH_CLOSE_RECT.position),
-		_to_canvas(TOUCH_CLOSE_RECT.size))
+	return Rect2(_art.to_canvas(TOUCH_CLOSE_RECT.position),
+		_art.to_canvas(TOUCH_CLOSE_RECT.size))
 
 
 func _draw_close_button() -> void:
@@ -405,26 +265,26 @@ func _draw_overlay() -> void:
 			_draw_close_button()          # the box is placed as a node
 		Screen.GO:
 			_draw_close_button()
-			var tick := _tex("gomenu_1")
+			var tick := _art.tex("gomenu_1")
 			for rd in 30:
 				var n: int = mini(cfg.completions[rd], TICK_MAX)
 				var base := TICK_BASE
-				base.y += ((rd % 15) / 3) * GO_WORLD_PITCH + (rd % 3) * GO_ROAD_PITCH
+				base.y += ((rd % 15) / 3) * MenuArt.GO_WORLD_PITCH + (rd % 3) * MenuArt.GO_ROAD_PITCH
 				if rd >= 15:
-					base.x += GO_COLUMN
+					base.x += MenuArt.GO_COLUMN
 				for t in n:
 					_overlay.draw_texture_rect(tick, Rect2(
-						_to_canvas(Vector2(base.x + t * TICK_PITCH, base.y)),
+						_art.to_canvas(Vector2(base.x + t * TICK_PITCH, base.y)),
 						Vector2(6, 5 * SkyRoads.PIXEL_ASPECT)), false)
 			# selection: the name cell redrawn through the brightening
 			# remap, exactly where it already sits (game.c:147-155)
 			var c := road_cell(go_sel)
-			if not _go_idx.is_empty():
-				_overlay.draw_texture_rect(_highlight_tex(go_sel),
-					Rect2(_to_canvas(Vector2(c.x, c.y)),
+			if _art.has_highlight():
+				_overlay.draw_texture_rect(_art.highlight_tex(go_sel),
+					Rect2(_art.to_canvas(Vector2(c.x, c.y)),
 					Vector2(48, 9 * SkyRoads.PIXEL_ASPECT)), false)
 			else:
-				_overlay.draw_rect(Rect2(_to_canvas(Vector2(c.x - 1, c.y - 1)),
+				_overlay.draw_rect(Rect2(_art.to_canvas(Vector2(c.x - 1, c.y - 1)),
 					Vector2(50, 11 * SkyRoads.PIXEL_ASPECT)),
 					Color(1, 1, 1, 0.35), false, 1.0)
 		Screen.SETTINGS:
@@ -443,24 +303,6 @@ func _draw_overlay() -> void:
 			pass
 
 
-func _gfx_pos(file: String, name: String) -> Vector2:
-	for e in _gfx.get(file, []):
-		if e["file"] == name + ".png":
-			return Vector2(e["screen_x"], e["screen_y"])
-	return Vector2.ZERO
-
-
-## An overlay pict's rectangle in canvas space. The picts are the original's
-## own outlines around each item, so their offsets and sizes ARE the item
-## layout — no screen coordinates need inventing for touch or for dimming.
-func _gfx_rect(file: String, name: String) -> Rect2:
-	for e in _gfx.get(file, []):
-		if e["file"] == name + ".png":
-			return Rect2(_to_canvas(Vector2(e["screen_x"], e["screen_y"])),
-				Vector2(float(e["w"]), float(e["h"]) * SkyRoads.PIXEL_ASPECT))
-	return Rect2()
-
-
 ## Is settings item `i` the setting currently in force? fn_4ae2's test,
 ## verbatim: the control device for items 0-2, the sound flag for 3-4. On a
 ## phone the control row is dimmed and the device is the touchscreen, so
@@ -475,14 +317,14 @@ func _state_marked(i: int) -> bool:
 
 ## Settings item `i` (0-2 control device, 3-4 sound), from setmenu pict 1+i.
 func _item_rect(i: int) -> Rect2:
-	return _gfx_rect("setmenu", "setmenu_%d" % (SET_CURSOR_FIRST + i))
+	return _art.gfx_rect("setmenu", "setmenu_%d" % (SET_CURSOR_FIRST + i))
 
 
 ## Main-menu item `i`. The three mainmenu picts share one 68x57 box — they
 ## highlight a row inside it rather than moving — so the rows are that box
 ## split three ways.
 func _main_item_rect(i: int) -> Rect2:
-	var box := _gfx_rect("mainmenu", "mainmenu_0")
+	var box := _art.gfx_rect("mainmenu", "mainmenu_0")
 	var h := box.size.y / float(MenuModel.MAIN_ITEMS)
 	return Rect2(box.position + Vector2(0, h * i), Vector2(box.size.x, h))
 
@@ -513,12 +355,12 @@ func _keys_for_tap(p: Vector2) -> Array:
 				# pitch and the full column, so the gaps between rows belong to
 				# the nearest road instead of to nothing. A finger is about 40
 				# device pixels across and the drawn cell is 22 tall.
-				var r := Rect2(_to_canvas(Vector2(c.x, c.y)),
+				var r := Rect2(_art.to_canvas(Vector2(c.x, c.y)),
 					Vector2(48, 9 * SkyRoads.PIXEL_ASPECT))
 				if touch_ui:
-					r = Rect2(_to_canvas(Vector2(c.x - 4, c.y - 1)),
-						Vector2(GO_COLUMN - 8,
-							GO_ROAD_PITCH * SkyRoads.PIXEL_ASPECT))
+					r = Rect2(_art.to_canvas(Vector2(c.x - 4, c.y - 1)),
+						Vector2(MenuArt.GO_COLUMN - 8,
+							MenuArt.GO_ROAD_PITCH * SkyRoads.PIXEL_ASPECT))
 				if r.has_point(p):
 					if rd == go_sel:
 						return [MenuModel.Key.ENTER]

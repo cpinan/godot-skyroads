@@ -80,7 +80,8 @@ func _draw() -> void:
 				Color(1, 0.4, 1.0))
 
 	# and where the simulation says the ship is — its grid cell, not its sprite
-	var lane: int = (_play.x / 0x80 - 0x5F) / 0x2E
+	var lane: int = (_play.x / 0x80 - SkyRoadsCamera.ROAD_LEFT_PX) \
+		/ SkyRoadsCamera.LANE_W_PX
 	var sy: float = (_play.y - SkyRoads.Y_DECK) * SkyRoadsCamera.WORLD_PER_GAME_Y
 	var slane: float = (float(_play.x) - 32768.0) / float(SkyRoads.COL_W)
 	_label("SHIP r%d c%d y%+d" % [row, lane, _play.y - SkyRoads.Y_DECK],

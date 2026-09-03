@@ -24,6 +24,7 @@ func _init() -> void:
 	for idx in [1, 30]:
 		_check_road(idx)
 	_check_lateral_alignment()
+	_camera_is_not_the_generated_one()
 	print("Result: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -163,3 +164,60 @@ func _check_road(idx: int) -> void:
 	if drawn_but_hole == 0 and hole_but_drawn == 0:
 		print("road %2d: %d cells, %d without floor — drawn road matches collision"
 			% [idx, road.rows * SkyRoads.COLS, holes])
+
+
+## A tripwire on `data/SkyRoadsCamera.gd`, which is a landmine.
+##
+## `sra export-godot` still WRITES that file, from a template that begins
+## "GENERATED — do not edit by hand". It has not been generated since
+## 2026-08-30, when the pinhole fit it carries was refuted by decoding the
+## actual TREKDAT span tables. What the file holds now is hand-derived and is
+## most of the port's visual fidelity: the DOS material and its shader, the
+## horizontal cone, the raised-surface height ladder (§12.18), the arch band
+## fan (§12.21) and the ship-row split. The template has NONE of those — it is
+## 3,946 characters of constants and nothing else.
+##
+## So an innocent `sra export-godot`, run to refresh a level or a sprite, would
+## silently replace all of it with the refuted fit, and nothing in the project
+## would say so until somebody noticed the road looked wrong. This fails
+## instead, immediately and by name.
+##
+## If it ever fires: `git checkout -- data/SkyRoadsCamera.gd`, and then fix the
+## exporter so it stops writing a file it no longer owns.
+func _camera_is_not_the_generated_one() -> void:
+	# the refuted fit put the camera a full row too far back
+	check(absf(SkyRoadsCamera.FOCAL_PX - 282.7632) < 0.001,
+		"camera FOCAL_PX is the measured 282.7632, not the refuted 279.7 (%f)"
+		% SkyRoadsCamera.FOCAL_PX)
+	check(absf(SkyRoadsCamera.BEHIND_ROWS - 2.55) < 0.001,
+		"camera BEHIND_ROWS is the measured 2.55, not the refuted 3.535 (%f)"
+		% SkyRoadsCamera.BEHIND_ROWS)
+	# The three things the generator's template does not contain at all. Their
+	# ABSENCE would be a parse error rather than a failed check, which the gate
+	# does catch — but as "res://tests/test_geometry.gd failed to load", which
+	# says nothing about why. Calling them tests the value as well as the name.
+	#
+	# The height ladder passes through exactly 1.0 at the ship's own depth: a
+	# block beside the ship is where the pinhole puts it, and everything else
+	# is drawn flatter or taller than perspective would draw it (§12.18).
+	check(absf(SkyRoadsCamera.dos_y_scale(SkyRoadsCamera.BEHIND_ROWS) - 1.0) < 0.005,
+		"the height ladder is 1.0 at the ship's own depth (%f)"
+		% SkyRoadsCamera.dos_y_scale(SkyRoadsCamera.BEHIND_ROWS))
+	check(SkyRoadsCamera.dos_y_scale(1.05) > 1.2
+		and SkyRoadsCamera.dos_y_scale(6.55) < 0.6,
+		"and it flattens with distance, 1.29 near and 0.48 far")
+	check(absf(SkyRoadsCamera.dos_x_scale(SkyRoadsCamera.BEHIND_ROWS) - 1.0) < 0.02,
+		"the horizontal cone is ~1.0 at that depth too (%f)"
+		% SkyRoadsCamera.dos_x_scale(SkyRoadsCamera.BEHIND_ROWS))
+	check(SkyRoadsCamera.ARCH_BAND_RATIOS.size() == 4
+		and SkyRoadsCamera.ARCH_RECORD_LEFT.size() == 6,
+		"and the arch band fan is still here (§12.21)")
+	# the shared shader cache: three render_mode combinations, not eight
+	var opaque := SkyRoadsCamera.make_dos_material()
+	var cover := SkyRoadsCamera.make_dos_material(true, true, false, 2)
+	check(opaque.shader != null and cover.shader != null
+		and opaque.shader != cover.shader,
+		"the opaque and cover passes are different shaders, as they must be")
+	check(SkyRoadsCamera.make_dos_material().shader == opaque.shader,
+		"and two materials of the same kind SHARE one, so a road restart "
+		+ "costs the driver no new program compiles")

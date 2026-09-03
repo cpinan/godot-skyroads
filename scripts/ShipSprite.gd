@@ -176,7 +176,8 @@ func _build_shadow_textures() -> void:
 
 
 static func _tilt(x: int) -> int:
-	return clampi((x / 0x80 - 95) / 46, 0, 6)
+	return clampi((x / 0x80 - SkyRoadsCamera.ROAD_LEFT_PX)
+		/ SkyRoadsCamera.LANE_W_PX, 0, 6)
 
 
 ## `tilt` comes from the caller so the frame agrees with the interpolated
@@ -257,15 +258,15 @@ func sync(play: SkyRoadsPlay, on_sticky: bool, view_x: int = -1,
 	if play.expl_ctr != 0 or _shadow_tex.is_empty():
 		return
 	var in_tun := play.in_tunnel(play.z, px, py)
-	var g: int = maxi(_support(play, (px - 0x380) & 0xFFFF, in_tun),
-		_support(play, (px + 0x380) & 0xFFFF, in_tun))
+	var g: int = maxi(_support(play, (px - SkyRoads.SHADOW_PROBE_X) & 0xFFFF, in_tun),
+		_support(play, (px + SkyRoads.SHADOW_PROBE_X) & 0xFFFF, in_tun))
 	if g == 0:
 		return
 	# the DOS remap (render.c draw_shadow:292-311) only darkens floor colours
 	# 1..15 and the block side — a shadow cast onto a block TOP never shows,
 	# and drawing one misleads about height while judging a jump
-	var sh_l := (play.tile_at(play.z, (px - 0x380) & 0xFFFF) >> 8) & 0xF
-	var sh_r := (play.tile_at(play.z, (px + 0x380) & 0xFFFF) >> 8) & 0xF
+	var sh_l := (play.tile_at(play.z, (px - SkyRoads.SHADOW_PROBE_X) & 0xFFFF) >> 8) & 0xF
+	var sh_r := (play.tile_at(play.z, (px + SkyRoads.SHADOW_PROBE_X) & 0xFFFF) >> 8) & 0xF
 	if (sh_l >= 2 and sh_l <= 5) or (sh_r >= 2 and sh_r <= 5):
 		return
 	var clearance := (py - g) / 0x80
